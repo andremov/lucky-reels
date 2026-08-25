@@ -1,0 +1,10 @@
+@import 'tailwindcss';
+
+@layer base {
+  body {
+    background-color: #14101d;
+    color: white;
+    color-scheme: dark;
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+}
