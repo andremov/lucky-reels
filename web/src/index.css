@@ -1,8 +1,20 @@
 @import 'tailwindcss';
 
+@theme {
+  --color-page: #14101d;
+  --color-case: #241b33;
+  --color-case-edge: #3a2d52;
+  --color-window: #120c1c;
+  --color-reel: #f6f1e6;
+  --color-gold: #f2c14e;
+  --color-gold-dim: #b8912f;
+
+  --spacing-cell: 4rem;
+}
+
 @layer base {
   body {
-    background-color: #14101d;
+    background-color: var(--color-page);
     color: white;
     color-scheme: dark;
     font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;

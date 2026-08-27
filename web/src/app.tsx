@@ -1,3 +1,9 @@
+import SlotMachine from '@/features/game/slot-machine';
+
 export default function App() {
-  return <h1 className="p-4 text-2xl">Lucky Reels</h1>;
+  return (
+    <main className="flex min-h-dvh items-center justify-center p-4">
+      <SlotMachine />
+    </main>
+  );
 }
