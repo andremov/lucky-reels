@@ -48,3 +48,7 @@ Thumbs.db
 
 # --- Vercel ---
 .vercel
+
+# --- Certs: the Supabase CA is public and belongs in the repo; nothing else does ---
+api/certs/*
+!api/certs/supabase-ca.crt
