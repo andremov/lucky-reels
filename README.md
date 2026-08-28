@@ -125,11 +125,11 @@ Frontend, verified by `npm run test:cov` in `web/` with `tsc -b` clean:
 
 | | Statements | Branches | Functions | Lines |
 |---|---|---|---|---|
-| All files | 93.78% | 83.58% | 89.72% | 94.77% |
-| `features/checkout` | 92.52% | 81.85% | 88.33% | 93.59% |
-| `features/game` | 98.95% | 96.55% | 95.45% | 100% |
+| All files | 93.73% | 82.31% | 90.56% | 94.73% |
+| `features/checkout` | 92.63% | 81.07% | 89.47% | 93.71% |
+| `features/game` | 98.95% | 93.10% | 95.45% | 100% |
 
-106 tests across 11 suites.
+126 tests across 13 suites.
 
 Backend, verified by `npm run test:cov` in `api/` with `tsc -b --force` clean:
 
