@@ -107,6 +107,14 @@ cd web && npm test        # or npm run test:cov
 cd api && npm test
 ```
 
+> **The API suite writes to the database `DATABASE_URL` points at.** Its
+> repository tests are integration tests: they insert products, customers and
+> transactions, mutate stock, and delete rows on teardown. Point `DATABASE_URL`
+> at a scratch database before running them, never at anything you care about.
+> With the variable unset those tests skip — you get 215 passing, 10 skipped and
+> one failure, because `app.module.spec` boots a module that requires the
+> variable. That failure is environmental, not a regression.
+
 Run `npx tsc -b` too. Jest transpiles each file without whole-project type
 checking, so a green suite does **not** mean the project type-checks — that gap
 hid two real type errors here until `tsc` was run separately.
@@ -169,11 +177,19 @@ screens.
 
 `POST /transactions` reserves stock; approval commits it, and a decline, an
 error or an expiry returns it. The invariant that matters is that the last unit
-cannot be sold twice. It is enforced by a row lock and covered by unit tests on
-the aggregate, and an integration test against a real database asserts that two
-concurrent reservations for a single remaining unit yield exactly one success
-and one `OUT_OF_STOCK`, leaving `available` at 0 and `reserved` at 1. Settling
+cannot be sold twice. A `SELECT … FOR UPDATE` row lock is what enforces it, and
+the aggregate's own rules are unit-tested. On top of that, an integration test
+against the real database issues two reservations for the last unit
+concurrently and asserts exactly one succeeds, the other fails with
+`OUT_OF_STOCK`, and the final state is `available` 0 / `reserved` 1. Settling
 the same transaction twice leaves the first outcome standing.
+
+To be precise about what that test does and does not show: it issues both
+requests without awaiting the first, but it cannot force Postgres to interleave
+them on any given run, so a run where the first commits first passes for the
+weaker reason that stock was simply exhausted. The lock is what makes the
+genuinely interleaved case safe; the test demonstrates the outcome rather than
+reproducing the race deterministically.
 
 ### Settlement
 
