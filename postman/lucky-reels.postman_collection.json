@@ -121,10 +121,10 @@
                 "pay"
               ]
             },
-            "description": "The card is tokenised in the BROWSER against the gateway; the number never reaches this API. Returns 202 Accepted -- accepted, not decided. Safe to retry with the same reference: a second call returns current state rather than charging twice. Fails with TRANSACTION_NOT_FOUND, TRANSACTION_ALREADY_SETTLED, TRANSACTION_EXPIRED, PAYMENT_REJECTED.",
+            "description": "The card is tokenised in the BROWSER against the gateway; the number never reaches this API. Returns 202 Accepted -- accepted, not decided; poll GET /transactions/{reference} for the outcome.\n\nThe gateway is stubbed, so the token chooses the branch:\n  tok_ok      -> APPROVED  (credits granted, stock committed)\n  tok_decline -> DECLINED  (nothing charged, stock released)\n  tok_error   -> ERROR     (nothing charged, stock released)\nMatching is on substring and case-insensitive; 'error' wins if a token asks for both. In the web UI the same branches are reached with test cards 4242424242424242, 4000000000000002 and 4000000000000119.\n\nSafe to retry with the same reference: a second call returns the current state rather than charging twice. Fails with TRANSACTION_NOT_FOUND or TRANSACTION_EXPIRED.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"paymentToken\": \"tok_stagtest_replace_me\",\n  \"acceptanceToken\": \"replace_me\",\n  \"installments\": 1\n}",
+              "raw": "{\n  \"paymentToken\": \"tok_ok\",\n  \"acceptanceToken\": \"acc_stub\",\n  \"installments\": 1\n}",
               "options": {
                 "raw": {
                   "language": "json"
