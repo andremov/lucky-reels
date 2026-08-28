@@ -256,6 +256,14 @@ reverse.
   card number, CVV or payment token reaches persisted storage.
 - *Amounts are server-authoritative.* The client cannot influence what it is
   charged, because it never computes it.
+- *CORS is an exact-match allowlist, tested against origin-prefix spoofing.* The
+  API echoes `Access-Control-Allow-Origin` only for the frontend origin and
+  `localhost:5173`. It refuses `https://evil.example.com`, and — the case that
+  actually matters — it also refuses
+  `https://lucky-reels-andremovs-projects.vercel.app.evil.com`. An allowlist
+  implemented with `startsWith` or `includes` passes the first two checks while
+  granting an attacker-controlled subdomain suffix full access; this one does
+  not.
 
 No credentials are in this repository or its history: `.env` is gitignored and
 only empty `.env.example` files have ever been committed.
