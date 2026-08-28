@@ -21,6 +21,10 @@ describe('planSettlement', () => {
     it('keeps the gateway id for tracing the charge', () => {
       expect(planSettlement(approved, 1, 20).gatewayTransactionId).toBe('g1');
     });
+
+    it('assigns the goods for delivery', () => {
+      expect(planSettlement(approved, 1, 20).deliveryStatus).toBe('ASSIGNED');
+    });
   });
 
   describe('declined', () => {
@@ -43,6 +47,10 @@ describe('planSettlement', () => {
     it('carries the status through', () => {
       expect(planSettlement(declined, 1, 20).status).toBe('DECLINED');
     });
+
+    it('assigns nothing for delivery', () => {
+      expect(planSettlement(declined, 1, 20).deliveryStatus).toBe('PENDING');
+    });
   });
 
   describe('gateway error', () => {
@@ -61,12 +69,23 @@ describe('planSettlement', () => {
     it('grants nothing', () => {
       expect(planSettlement(errored, 1, 20).creditsGranted).toBeNull();
     });
+
+    it('assigns nothing for delivery', () => {
+      expect(planSettlement(errored, 1, 20).deliveryStatus).toBe('PENDING');
+    });
   });
 
   it('never grants credits without also issuing a token to spend them', () => {
     for (const outcome of [approved, declined, errored] as const) {
       const plan = planSettlement(outcome, 2, 20);
       expect(plan.creditsGranted !== null).toBe(plan.issuePlayerToken);
+    }
+  });
+
+  it('assigns delivery exactly when it commits stock', () => {
+    for (const outcome of [approved, declined, errored] as const) {
+      const plan = planSettlement(outcome, 1, 20);
+      expect(plan.deliveryStatus === 'ASSIGNED').toBe(plan.stockMove === 'commit');
     }
   });
 

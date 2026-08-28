@@ -74,6 +74,16 @@ describeIfDb('TypeormTransactionRepository (integration)', () => {
       [productId, available],
     );
 
+  const deliveryStatusFor = async (reference: string): Promise<string> => {
+    const rows = await dataSource.query(
+      `select d.status from deliveries d
+         join transactions t on t.id = d.transaction_id
+        where t.reference = $1`,
+      [reference],
+    );
+    return rows[0]?.status;
+  };
+
   const stockNow = async (): Promise<{ available: number; reserved: number }> => {
     const rows = await dataSource.query(
       'select available, reserved from stock where product_id = $1',
@@ -139,6 +149,7 @@ describeIfDb('TypeormTransactionRepository (integration)', () => {
     expect(settled.match({ ok: (t) => t.status, err: () => null })).toBe('APPROVED');
     expect(settled.match({ ok: (t) => t.creditsGranted, err: () => null })).toBe(5);
     expect(await stockNow()).toEqual({ available: 2, reserved: 0 });
+    expect(await deliveryStatusFor(reference)).toBe('ASSIGNED');
   });
 
   it('hands the reservation back when the payment is declined', async () => {
@@ -154,6 +165,7 @@ describeIfDb('TypeormTransactionRepository (integration)', () => {
 
     expect(settled.match({ ok: (t) => t.status, err: () => null })).toBe('DECLINED');
     expect(await stockNow()).toEqual({ available: 3, reserved: 0 });
+    expect(await deliveryStatusFor(reference)).toBe('PENDING');
   });
 
   it('settles a second time without paying twice', async () => {

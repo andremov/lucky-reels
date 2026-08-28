@@ -246,6 +246,11 @@ export class TypeormTransactionRepository implements TransactionRepository {
       [plan.status, plan.gatewayTransactionId, credits, playerToken, row.id],
     );
 
+    await runner.query(
+      'update deliveries set status = $1 where transaction_id = $2',
+      [plan.deliveryStatus, row.id],
+    );
+
     if (credits !== null) {
       await runner.query(
         `insert into balances (customer_id, credits)

@@ -8,6 +8,8 @@ export type Settlement = {
   creditsGranted: number | null;
   issuePlayerToken: boolean;
   gatewayTransactionId: string | null;
+  /** An approved sale assigns the goods for delivery; nothing else does. */
+  deliveryStatus: 'ASSIGNED' | 'PENDING';
 };
 
 /**
@@ -29,6 +31,7 @@ export function planSettlement(
       creditsGranted: spinsGranted * quantity,
       issuePlayerToken: true,
       gatewayTransactionId,
+      deliveryStatus: 'ASSIGNED',
     };
   }
 
@@ -38,5 +41,6 @@ export function planSettlement(
     creditsGranted: null,
     issuePlayerToken: false,
     gatewayTransactionId,
+    deliveryStatus: 'PENDING',
   };
 }
