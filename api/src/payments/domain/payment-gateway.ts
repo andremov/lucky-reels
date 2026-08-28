@@ -4,6 +4,7 @@ export type ChargeInput = {
   currency: 'COP';
   paymentToken: string;
   installments: number;
+  customerEmail: string;
 };
 
 export type ChargeOutcome =

@@ -53,6 +53,10 @@ export class FakeTransactionRepository implements TransactionRepository {
     return Promise.resolve(this.stored.find((t) => t.reference === reference) ?? null);
   }
 
+  customerEmailFor(): Promise<string | null> {
+    return Promise.resolve('buyer@example.test');
+  }
+
   readonly settled: { reference: string; outcome: ChargeOutcome }[] = [];
 
   settle(
@@ -90,6 +94,10 @@ export class FailingTransactionRepository implements TransactionRepository {
   }
 
   findByReference(): Promise<TransactionView | null> {
+    return Promise.reject(this.reason);
+  }
+
+  customerEmailFor(): Promise<string | null> {
     return Promise.reject(this.reason);
   }
 

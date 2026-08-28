@@ -49,13 +49,18 @@ export class PayTransaction {
 
   private charge(transaction: TransactionView, input: PayInput) {
     return ResultAsync.fromPromise(
-      this.gateway.charge({
-        reference: transaction.reference,
-        amountCents: transaction.amounts.totalCents,
-        currency: 'COP',
-        paymentToken: input.paymentToken,
-        installments: input.installments,
-      }),
+      this.transactions
+        .customerEmailFor(transaction.reference)
+        .then((email) =>
+          this.gateway.charge({
+            reference: transaction.reference,
+            amountCents: transaction.amounts.totalCents,
+            currency: 'COP',
+            paymentToken: input.paymentToken,
+            installments: input.installments,
+            customerEmail: email ?? 'unknown@lucky-reels.invalid',
+          }),
+        ),
       internalError,
     ).andThen((outcome) =>
       ResultAsync.fromPromise(
