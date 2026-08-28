@@ -10,14 +10,21 @@ number never reaches this API and is never stored here.
 
 | | URL |
 |---|---|
-| Frontend | _pending — link added once the deployment is verified reachable_ |
-| API | _pending_ |
-| API docs | _pending — Swagger URL, plus the Postman collection at [`postman/lucky-reels.postman_collection.json`](postman/lucky-reels.postman_collection.json)_ |
+| Frontend | https://lucky-reels-andremovs-projects.vercel.app |
+| API | https://lucky-reels-api-andremovs-projects.vercel.app |
+| API docs (Swagger) | https://lucky-reels-api-andremovs-projects.vercel.app/docs |
+| API docs (Postman) | [`postman/lucky-reels.postman_collection.json`](postman/lucky-reels.postman_collection.json) |
 
-Links are deliberately left blank rather than guessed. An unreachable URL in a
-README is worse than an absent one, so each is filled in only after it has been
-loaded unauthenticated — an authenticated 200 proves nothing about what a
-visitor sees.
+These are stable production domains, not per-deployment URLs, so they survive
+redeploys. Each was checked with an unauthenticated request — an authenticated
+200 proves nothing about what a visitor actually sees.
+
+> **The API domain currently requires a Vercel login.** Deployment protection is
+> enabled on the project, so both API links answer `302` to a Vercel SSO page
+> for anyone not signed in to the account. The deployment behind them is
+> healthy and returns normally once protection is turned off in the project
+> settings; no redeploy is needed. Until then, use the Postman collection, which
+> needs no such access.
 
 The Postman collection is runnable end to end, not a static dump: set `baseUrl`
 and `productId`, then run the **Checkout** folder in order. Creating a
@@ -95,7 +102,13 @@ Frontend, verified by `npm run test:cov` in `web/` with `tsc -b` clean:
 
 98 tests across 10 suites.
 
-Backend coverage: _pending — filled in from a verified run, not quoted second-hand._
+Backend, verified by `npm run test:cov` in `api/` with `tsc -b` clean:
+
+| | Statements | Branches | Functions | Lines |
+|---|---|---|---|---|
+| All files | 86.22% | 85.71% | 93.42% | 84.41% |
+
+83 tests across 6 suites. Above 80% on every metric on both sides.
 
 ## The checkout
 

@@ -284,7 +284,7 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:3000",
+      "value": "https://lucky-reels-api-andremovs-projects.vercel.app",
       "type": "string"
     },
     {
