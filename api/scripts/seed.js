@@ -89,6 +89,17 @@ const SCHEMA = `
     updated_at timestamptz not null default now()
   );
 
+  create table if not exists spins (
+    id uuid primary key default gen_random_uuid(),
+    customer_id uuid not null references customers(id) on delete cascade,
+    reels text not null,
+    payout_credits int not null,
+    balance_after int not null,
+    created_at timestamptz not null default now()
+  );
+
+  create index if not exists spins_customer_idx on spins(customer_id, created_at desc);
+
   create table if not exists deliveries (
     id uuid primary key default gen_random_uuid(),
     transaction_id uuid not null unique references transactions(id) on delete cascade,
