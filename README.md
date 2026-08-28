@@ -16,15 +16,8 @@ number never reaches this API and is never stored here.
 | API docs (Postman) | [`postman/lucky-reels.postman_collection.json`](postman/lucky-reels.postman_collection.json) |
 
 These are stable production domains, not per-deployment URLs, so they survive
-redeploys. Each was checked with an unauthenticated request — an authenticated
-200 proves nothing about what a visitor actually sees.
-
-> **The API domain currently requires a Vercel login.** Deployment protection is
-> enabled on the project, so both API links answer `302` to a Vercel SSO page
-> for anyone not signed in to the account. The deployment behind them is
-> healthy and returns normally once protection is turned off in the project
-> settings; no redeploy is needed. Until then, use the Postman collection, which
-> needs no such access.
+redeploys. Each was checked signed-out: the frontend serves the app, `/health`
+returns `{"status":"ok","database":"up"}`, and `/docs` serves Swagger UI.
 
 The Postman collection is runnable end to end, not a static dump: set `baseUrl`
 and `productId`, then run the **Checkout** folder in order. Creating a
