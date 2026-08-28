@@ -2,10 +2,12 @@
 
 Buy a pack of spins with a card; once the payment clears, play the reels.
 
-A React SPA and a NestJS API, both deployed as separate projects. Payments run
-through a **stubbed** card gateway behind a port — no external provider is
-called; see [Settlement](#settlement). The card is tokenised in the browser, so
-the number never reaches this API and is never stored here.
+A React SPA and a NestJS API, both deployed as separate projects. The payment
+gateway sits behind a port with two implementations: a live adapter that calls
+the provider's sandbox, and a stub. **The deployed demo runs the stub** so every
+payment outcome stays reachable — see [Settlement](#settlement). The card is
+tokenised in the browser on both paths, so the number never reaches this API and
+is never stored here.
 
 ## Live
 
@@ -126,11 +128,11 @@ Frontend, verified by `npm run test:cov` in `web/` with `tsc -b` clean:
 
 | | Statements | Branches | Functions | Lines |
 |---|---|---|---|---|
-| All files | 93.73% | 82.31% | 90.56% | 94.73% |
-| `features/checkout` | 92.63% | 81.07% | 89.47% | 93.71% |
-| `features/game` | 98.95% | 93.10% | 95.45% | 100% |
+| All files | 94.06% | 82.40% | 91.27% | 95.23% |
+| `features/checkout` | 93.15% | 80.96% | 90.41% | 94.42% |
+| `features/game` | 98.94% | 96.55% | 95.45% | 100% |
 
-126 tests across 13 suites.
+151 tests across 15 suites.
 
 Backend, verified by `npm run test:cov` in `api/` with `tsc -b --force` clean:
 
@@ -337,11 +339,12 @@ given and cannot influence it.
 adapters for HTTP, persistence and the gateway, so the database and the payment
 provider are swappable without touching use cases.
 
-**The payment gateway is a port, not a hard-coded call.** `PaymentGateway` is an
-interface with `StubGateway` as one implementation; swapping in a real provider
-is one adapter and one binding in the module, with no use case touched. The stub
-is a seam, not a shortcut — which is also why the outcome is steerable from a
-test card rather than random.
+**The payment gateway is a port with two real implementations.** `PaymentGateway`
+is an interface; `StubGateway` and `LiveGateway` both implement it, and
+`selectGateway` picks between them from configuration alone — no use case,
+controller or frontend code knows which is bound. This is not a seam we merely
+claim would work: the live adapter exists, is tested against the provider's
+sandbox, and was exercised end to end through the browser.
 
 **Railway-oriented programming** — a `Result`/`ResultAsync` type carries expected
 failures as values through the use-case layer instead of throwing, so every
@@ -350,18 +353,22 @@ error path is visible in the type signature rather than discovered at runtime.
 **Mobile-first responsive CSS** — Tailwind, built narrow and widened, not the
 reverse.
 
-**Security.** Three specific things, none of them incidental:
+**Security.** Four specific things, none of them incidental:
 
 - *Verified TLS against a pinned Supabase root CA.* The database connection
   verifies the full chain against the committed CA rather than disabling
   verification with `rejectUnauthorized: false`. As above, this endpoint's chain
   is self-signed at the root, so strict verification only works *because* the CA
   is pinned — the certificate is load-bearing, not decorative.
-- *Card data never enters application state.* Card number, CVV and expiry live
-  in component state on the payment step and die with it. They are never
-  dispatched into Redux, never written to storage, and never sent to this API —
-  the gateway tokenises in the browser. A test asserts that nothing resembling a
-  card number, CVV or payment token reaches persisted storage.
+- *Card data never enters application state, and this is observed rather than
+  argued.* Card number, CVV and expiry live in component state on the payment
+  step and die with it — never dispatched into Redux, never written to storage,
+  never sent to this API. A test asserts that nothing resembling a card number,
+  CVV or payment token reaches persisted storage. During a live tokenisation
+  against the provider's sandbox, the network tab shows the card reaching
+  `api-sandbox…/v1/tokens/cards` and **no request to this API carrying card
+  data** — a card the provider refuses produces no request to this API at all.
+  Only the returned token id is ever sent here.
 - *Amounts are server-authoritative.* The client cannot influence what it is
   charged, because it never computes it.
 - *CORS is an exact-match allowlist, tested against origin-prefix spoofing.* The
