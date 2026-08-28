@@ -182,10 +182,11 @@ screens.
 
 ### Reservations and concurrency
 
-`POST /transactions` reserves stock; approval commits it, and a decline, an
-error or an expiry returns it. The invariant that matters is that the last unit
-cannot be sold twice. A `SELECT … FOR UPDATE` row lock is what enforces it, and
-the aggregate's own rules are unit-tested. On top of that, an integration test
+`POST /transactions` reserves stock; approval commits it, and a decline or an
+error returns it. An expiry does not — see the limitation noted below. The
+invariant that matters is that the last unit cannot be sold twice. A
+`SELECT … FOR UPDATE` row lock is what enforces it, and the aggregate's own
+rules are unit-tested. On top of that, an integration test
 against the real database issues two reservations for the last unit
 concurrently and asserts exactly one succeeds, the other fails with
 `OUT_OF_STOCK`, and the final state is `available` 0 / `reserved` 1. Settling
