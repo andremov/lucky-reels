@@ -3,8 +3,9 @@
 Buy a pack of spins with a card; once the payment clears, play the reels.
 
 A React SPA and a NestJS API, both deployed as separate projects. Payments run
-through a card gateway in test mode: the card is tokenised in the browser, so the
-number never reaches this API and is never stored here.
+through a **stubbed** card gateway behind a port — no external provider is
+called; see [Settlement](#settlement). The card is tokenised in the browser, so
+the number never reaches this API and is never stored here.
 
 ## Live
 
@@ -60,7 +61,7 @@ approves. Case-insensitive, and `error` wins if a token asks for both.
 
 ## Running locally
 
-Requires Node 22+ (developed on 24) and npm.
+Built and verified on Node 24 with npm. Earlier Node versions are untested.
 
 ### API
 
@@ -168,11 +169,11 @@ screens.
 
 `POST /transactions` reserves stock; approval commits it, and a decline, an
 error or an expiry returns it. The invariant that matters is that the last unit
-cannot be sold twice, and it is proven rather than asserted: an integration test
-against a real database fires two concurrent reservations at a product with one
-unit left and asserts exactly one succeeds while the other gets `OUT_OF_STOCK`,
-leaving `available` at 0 and `reserved` at 1. Settling the same transaction
-twice leaves the first outcome standing.
+cannot be sold twice. It is enforced by a row lock and covered by unit tests on
+the aggregate, and an integration test against a real database asserts that two
+concurrent reservations for a single remaining unit yield exactly one success
+and one `OUT_OF_STOCK`, leaving `available` at 0 and `reserved` at 1. Settling
+the same transaction twice leaves the first outcome standing.
 
 ### Settlement
 
@@ -182,6 +183,16 @@ failed one. Settlement is deliberately **polled, not webhook-driven**: a signed
 gateway callback needs a publicly reachable endpoint and secret verification
 that could not be honestly proven in the time available, so the webhook path is
 left unbuilt rather than half-built.
+
+**The gateway is stubbed, and the provider's sandbox API is not called.**
+Payments settle through `StubGateway`, one implementation of the
+`PaymentGateway` port; the card is tokenised in the browser and the token
+decides the outcome, which is what makes the approved, declined and errored
+branches all reachable from the card form above. No request is made to an
+external payment provider. Substituting a real one is a new adapter and one
+binding in the module — no use case, controller or frontend code changes — but
+that adapter is not written, and this README should not be read as claiming a
+live provider integration.
 
 ## Data model
 

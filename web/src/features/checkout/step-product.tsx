@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { loadProducts, productSelected, stepChanged } from './checkout-slice';
 import { formatCents } from './money';
 import { Button, ErrorNote } from './ui';
+import ProductImage from './product-image';
 
 export default function StepProduct() {
   const dispatch = useAppDispatch();
@@ -37,7 +38,8 @@ export default function StepProduct() {
                   isSelected ? 'border-gold bg-gold/10' : 'border-case-edge hover:border-gold/50'
                 }`}
               >
-                <span className="flex flex-col">
+                <ProductImage src={product.imageUrl} name={product.name} />
+                <span className="flex min-w-0 flex-col">
                   <span className="font-semibold">{product.name}</span>
                   <span className="text-sm text-white/60">{product.description}</span>
                   <span className="text-xs text-white/50">
