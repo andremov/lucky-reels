@@ -265,6 +265,17 @@ export class TypeormTransactionRepository implements TransactionRepository {
     return view ? ok(view) : err(transactionNotFound(reference));
   }
 
+  async customerEmailFor(reference: string): Promise<string | null> {
+    const rows: { email: string }[] = await this.dataSource.query(
+      `select c.email from transactions t
+         join customers c on c.id = t.customer_id
+        where t.reference = $1`,
+      [reference],
+    );
+
+    return rows[0]?.email ?? null;
+  }
+
   findByReference(reference: string): Promise<TransactionView | null> {
     return this.readByReference(this.dataSource, reference);
   }

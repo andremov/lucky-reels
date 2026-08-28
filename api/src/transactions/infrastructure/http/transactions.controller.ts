@@ -54,8 +54,9 @@ export class TransactionsController {
   @ApiOperation({
     summary: 'Submit payment for a transaction',
     description:
-      'Hands the gateway token over. Accepted, not decided: poll the transaction for the ' +
-      'outcome. Safe to retry with the same reference; a settled transaction is returned as is.',
+      'Hands the card token over to the payment gateway. Accepted, not decided: poll the ' +
+      'transaction for the outcome. Safe to retry with the same reference; a settled ' +
+      'transaction is returned as is rather than charged again.',
   })
   @ApiAcceptedResponse({ type: TransactionResponse })
   async pay(

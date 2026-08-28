@@ -5,8 +5,9 @@ export class PayTransactionDto {
   @ApiProperty({
     example: 'tok_test_visa_4242',
     description:
-      'Token from the gateway. The card number never reaches this API. ' +
-      'Against the stub, a token containing "decline" is declined and one containing "error" errors.',
+      'Card token from the provider, created in the browser so the card number never ' +
+      'reaches this API. Against the stub gateway the token decides the outcome: ' +
+      'tok_ok approves, tok_decline declines, tok_error errors.',
   })
   @IsString()
   @IsNotEmpty()

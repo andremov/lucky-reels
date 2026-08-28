@@ -33,6 +33,12 @@ export interface TransactionRepository {
   findByReference(reference: string): Promise<TransactionView | null>;
 
   /**
+   * The buyer's email, needed by the gateway. Deliberately not part of
+   * TransactionView: that is the HTTP response shape and this is PII.
+   */
+  customerEmailFor(reference: string): Promise<string | null>;
+
+  /**
    * Applies a gateway outcome under a row lock. Committing the reservation,
    * granting credits and marking the transaction settled are one unit of work,
    * and a transaction that is already settled is returned untouched so a

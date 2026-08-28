@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { payTransaction, stepChanged } from './checkout-slice';
 import { detectBrand, isValid, validateCard, type CardDraft, type Errors } from './validation';
-import { buildPaymentToken } from './payment-token';
+import { TokenizationError } from './card-tokenizer';
+import { useTokenizer } from './tokenizer-context';
 import AmountsTable from './amounts-table';
 import Modal from './modal';
 import { Button, ErrorNote, Field } from './ui';
@@ -25,6 +26,8 @@ export default function StepPayment() {
   const [card, setCard] = useState<CardDraft>(EMPTY);
   const [errors, setErrors] = useState<Errors>({});
   const [open, setOpen] = useState(false);
+  const [tokenizing, setTokenizing] = useState(false);
+  const tokenizer = useTokenizer();
 
   const brand = detectBrand(card.cardNumber);
   const set = (patch: Partial<CardDraft>) => setCard((prev) => ({ ...prev, ...patch }));
@@ -35,16 +38,36 @@ export default function StepPayment() {
     setCard(EMPTY); // Card details do not outlive the modal.
   };
 
-  const handlePay = () => {
+  const handlePay = async () => {
     const found = validateCard(card);
     setErrors(found);
     if (!isValid(found)) return;
 
-    // The real gateway tokenises in the browser; the card never reaches our API.
-    const paymentToken = buildPaymentToken(card.cardNumber);
+    // Tokenised in the browser, so the card number never reaches our API.
+    setTokenizing(true);
+    let paymentToken: string;
+    try {
+      paymentToken = await tokenizer.tokenize(card);
+    } catch (error) {
+      setTokenizing(false);
+      if (error instanceof TokenizationError) {
+        // The provider rejects specific fields; show it on the input it belongs
+        // to rather than as a dead end the customer cannot act on.
+        setErrors(
+          Object.keys(error.fieldErrors).length > 0
+            ? error.fieldErrors
+            : { cardNumber: error.message },
+        );
+        return;
+      }
+      setErrors({ cardNumber: 'Could not verify these card details. Please try again.' });
+      return;
+    }
+
+    setTokenizing(false);
     setCard(EMPTY);
     setOpen(false);
-    dispatch(payTransaction({ paymentToken, acceptanceToken: 'acc_stub', installments: 1 }));
+    dispatch(payTransaction({ paymentToken, installments: 1 }));
   };
 
   return (
@@ -121,8 +144,8 @@ export default function StepPayment() {
               <Button variant="ghost" onClick={closeModal}>
                 Cancel
               </Button>
-              <Button disabled={submitting} onClick={handlePay}>
-                {submitting ? 'Sending…' : 'Pay now'}
+              <Button disabled={submitting || tokenizing} onClick={handlePay}>
+                {tokenizing ? 'Checking card…' : submitting ? 'Sending…' : 'Pay now'}
               </Button>
             </div>
           </div>

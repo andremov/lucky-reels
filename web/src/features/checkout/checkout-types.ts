@@ -76,7 +76,8 @@ export type TransactionView = {
 
 export type PayInput = {
   paymentToken: string;
-  acceptanceToken: string;
+  /** Optional: the API fetches the acceptance token server-side. */
+  acceptanceToken?: string;
   installments: number;
 };
 
