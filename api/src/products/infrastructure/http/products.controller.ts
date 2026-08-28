@@ -1,4 +1,11 @@
-import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  ParseUUIDPipe,
+} from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { ProductError, ProductView } from '../../domain/product';
 import { GetProduct } from '../../application/get-product';
@@ -31,11 +38,24 @@ export class ProductsController {
     description: 'Fails with PRODUCT_NOT_FOUND when the id is unknown.',
   })
   @ApiOkResponse({ type: ProductResponse })
-  async byId(@Param('id') id: string): Promise<ProductView> {
+  async byId(
+    @Param('id', new ParseUUIDPipe({ exceptionFactory: rejectMalformedId }))
+    id: string,
+  ): Promise<ProductView> {
     const result = await this.getProduct.execute(id);
 
     return result.match({ ok: (product) => product, err: toHttpError });
   }
+}
+
+function rejectMalformedId(): never {
+  throw new BadRequestException({
+    error: {
+      code: 'VALIDATION_FAILED',
+      message: 'Invalid request',
+      details: [{ field: 'id', message: 'must be a uuid' }],
+    },
+  });
 }
 
 function toHttpError(error: ProductError): never {
