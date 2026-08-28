@@ -219,7 +219,13 @@ const checkoutSlice = createSlice({
       })
       .addCase(createTransaction.rejected, (state, action) => {
         state.submitting = false;
-        state.error = action.payload ?? toCheckoutError(action.error);
+        const error = action.payload ?? toCheckoutError(action.error);
+        state.error = error;
+        // The server rejected a field, not the order. Send them back to the
+        // form that owns it rather than showing a dead end on the summary.
+        if (error.code === 'VALIDATION_FAILED' && error.details.length > 0) {
+          state.step = 'details';
+        }
       })
 
       .addCase(payTransaction.pending, (state) => {

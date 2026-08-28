@@ -6,8 +6,17 @@ import { Button, Field } from './ui';
 
 export default function StepDetails() {
   const dispatch = useAppDispatch();
-  const { customer, delivery } = useAppSelector((s) => s.checkout);
+  const { customer, delivery, error } = useAppSelector((s) => s.checkout);
   const [errors, setErrors] = useState<Errors>({});
+
+  // The API reports field errors with the same dotted paths this form uses
+  // ("customer.email"), so a server rejection lands on the offending input
+  // rather than as an opaque banner.
+  const serverErrors: Errors = {};
+  if (error?.code === 'VALIDATION_FAILED') {
+    for (const detail of error.details) serverErrors[detail.field] = detail.message;
+  }
+  const shown: Errors = { ...serverErrors, ...errors };
 
   const handleContinue = () => {
     const found = validateDetails(customer, delivery);
@@ -24,7 +33,7 @@ export default function StepDetails() {
           label="Full name"
           name="fullName"
           value={customer.fullName ?? ''}
-          error={errors['customer.fullName']}
+          error={shown['customer.fullName']}
           onChange={(e) => dispatch(customerChanged({ fullName: e.target.value }))}
         />
         <Field
@@ -32,21 +41,21 @@ export default function StepDetails() {
           name="email"
           type="email"
           value={customer.email ?? ''}
-          error={errors['customer.email']}
+          error={shown['customer.email']}
           onChange={(e) => dispatch(customerChanged({ email: e.target.value }))}
         />
         <Field
           label="Phone"
           name="phone"
           value={customer.phone ?? ''}
-          error={errors['customer.phone']}
+          error={shown['customer.phone']}
           onChange={(e) => dispatch(customerChanged({ phone: e.target.value }))}
         />
         <Field
           label="Address"
           name="addressLine"
           value={delivery.addressLine ?? ''}
-          error={errors['delivery.addressLine']}
+          error={shown['delivery.addressLine']}
           onChange={(e) => dispatch(deliveryChanged({ addressLine: e.target.value }))}
         />
         <div className="grid grid-cols-2 gap-3">
@@ -54,14 +63,14 @@ export default function StepDetails() {
             label="City"
             name="city"
             value={delivery.city ?? ''}
-            error={errors['delivery.city']}
+            error={shown['delivery.city']}
             onChange={(e) => dispatch(deliveryChanged({ city: e.target.value }))}
           />
           <Field
             label="Region"
             name="region"
             value={delivery.region ?? ''}
-            error={errors['delivery.region']}
+            error={shown['delivery.region']}
             onChange={(e) => dispatch(deliveryChanged({ region: e.target.value }))}
           />
         </div>
@@ -69,7 +78,7 @@ export default function StepDetails() {
           label="Postal code"
           name="postalCode"
           value={delivery.postalCode ?? ''}
-          error={errors['delivery.postalCode']}
+          error={shown['delivery.postalCode']}
           onChange={(e) => dispatch(deliveryChanged({ postalCode: e.target.value }))}
         />
       </div>

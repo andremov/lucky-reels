@@ -216,6 +216,26 @@ describe('checkout wizard', () => {
     expect(screen.getByRole('heading', { name: /check your order/i })).toBeInTheDocument();
   });
 
+  it('lands a server field rejection on the offending input, not a banner', async () => {
+    // Mirrors the live API, which reports nested fields with dotted paths.
+    const client = createMockCheckoutClient();
+    jest.spyOn(client, 'createTransaction').mockRejectedValue(
+      new ApiError('VALIDATION_FAILED', 'Invalid request', 400, [
+        { field: 'customer.email', message: 'email must be an email' },
+      ]),
+    );
+    const { user } = setup(client);
+
+    await chooseStarterPack(user);
+    await user.click(screen.getByRole('button', { name: /confirm order/i }));
+
+    // Back on the details form, with the message attached to the email field.
+    expect(await screen.findByRole('heading', { name: /where should it go/i })).toBeInTheDocument();
+    const email = screen.getByLabelText(/email/i);
+    expect(email).toHaveAccessibleDescription('email must be an email');
+    expect(email).toBeInvalid();
+  });
+
   it('never writes card details to storage', async () => {
     const { user } = setup();
     await chooseStarterPack(user);
