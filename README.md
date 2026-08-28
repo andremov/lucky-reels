@@ -16,7 +16,14 @@ number never reaches this API and is never stored here.
 
 Links are deliberately left blank rather than guessed. An unreachable URL in a
 README is worse than an absent one, so each is filled in only after it has been
-loaded.
+loaded unauthenticated — an authenticated 200 proves nothing about what a
+visitor sees.
+
+The Postman collection is runnable end to end, not a static dump: set `baseUrl`
+and `productId`, then run the **Checkout** folder in order. Creating a
+transaction captures the `reference` into a collection variable, and polling the
+transaction captures the `playerToken` once the payment is `APPROVED`, which the
+**Game** requests then use automatically.
 
 ## Stack
 
