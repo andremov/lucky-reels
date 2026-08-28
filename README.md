@@ -136,9 +136,9 @@ Backend, verified by `npm run test:cov` in `api/` with `tsc -b --force` clean:
 
 | | Statements | Branches | Functions | Lines |
 |---|---|---|---|---|
-| All files | 87.07% | 81.41% | 83.41% | 86.80% |
+| All files | 88.17% | 82.05% | 83.48% | 88.29% |
 
-226 tests across 21 suites. Above 80% on every metric on both sides, with no
+283 tests across 24 suites. Above 80% on every metric on both sides, with no
 coverage exclusions.
 
 ## The checkout
@@ -209,15 +209,29 @@ gateway callback needs a publicly reachable endpoint and secret verification
 that could not be honestly proven in the time available, so the webhook path is
 left unbuilt rather than half-built.
 
-**The gateway is stubbed, and the provider's sandbox API is not called.**
-Payments settle through `StubGateway`, one implementation of the
-`PaymentGateway` port; the card is tokenised in the browser and the token
-decides the outcome, which is what makes the approved, declined and errored
-branches all reachable from the card form above. No request is made to an
-external payment provider. Substituting a real one is a new adapter and one
-binding in the module — no use case, controller or frontend code changes — but
-that adapter is not written, and this README should not be read as claiming a
-live provider integration.
+**The provider's sandbox is integrated, and the deployed demo runs the stub.**
+`LiveGateway` implements the same `PaymentGateway` port as `StubGateway` and
+calls the provider's sandbox: it fetches an acceptance token, signs the
+transaction with the integrity key, posts it and polls until the provider
+settles. It is verified against their sandbox — two consecutive approvals, a
+decline, and an approval after the decline, through a browser.
+
+Which one runs is decided by configuration. `selectGateway` binds the live
+adapter only when all four `PAYMENT_*` keys are present; absent or partially
+configured, the stub binds. **The deployed demo has no keys, so it runs the
+stub** — deliberately, because the stub reaches every outcome on demand while
+the sandbox has no card that produces a settled `ERROR`, and because a shared
+sandbox failing would take the checkout down with it.
+
+The card is tokenised in the browser against the public key on both paths, so
+the number never reaches this API. That is a choice rather than a constraint:
+server-side tokenisation works and is less work, and it would have made this
+paragraph false.
+
+One finding worth recording, because the documentation does not say it: **the
+acceptance token is single use.** Reusing one is refused with `El token de
+aceptación ya fue usado` before the card is considered, so it is fetched fresh
+for every charge rather than cached.
 
 **Abandoned reservations are never released.** A pending transaction carries an
 `expiresAt`, and paying after it lapses is correctly refused — but nothing

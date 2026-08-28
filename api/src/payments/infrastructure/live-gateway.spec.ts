@@ -227,4 +227,58 @@ describe('LiveGateway', () => {
     });
     expect(body.signature).toBe(signature('LR-ABC12345', 2_230_000, 'COP', CONFIG.integrityKey));
   });
+
+  it('supplies a decline reason when the provider sends none', async () => {
+    const { gateway } = harness((url) => {
+      if (url.includes('/merchants/')) return ok(MERCHANT);
+      if (url.endsWith('/transactions')) return ok({ data: { id: 'txn_1' } });
+      return ok({ data: { status: 'DECLINED' } });
+    });
+
+    expect(await gateway.charge(input())).toMatchObject({
+      result: 'DECLINED',
+      reason: 'Declined by the issuer',
+    });
+  });
+
+  it('supplies an error reason when the provider sends none', async () => {
+    const { gateway } = harness((url) => {
+      if (url.includes('/merchants/')) return ok(MERCHANT);
+      if (url.endsWith('/transactions')) return ok({ data: { id: 'txn_1' } });
+      return ok({ data: { status: 'VOIDED' } });
+    });
+
+    expect(await gateway.charge(input())).toMatchObject({
+      result: 'ERROR',
+      reason: 'Payment did not complete',
+    });
+  });
+
+  it('treats a merchant response with no acceptance token as unavailable', async () => {
+    const { gateway } = harness((url) =>
+      url.includes('/merchants/') ? ok({ data: {} }) : ok({ data: { id: 'txn_1' } }),
+    );
+
+    await expect(gateway.charge(input())).rejects.toThrow(/no acceptance token/i);
+  });
+
+  it('reports the provider status code when a transaction is refused', async () => {
+    const { gateway } = harness((url) =>
+      url.includes('/merchants/')
+        ? ok(MERCHANT)
+        : { ok: false, status: 422, json: () => Promise.resolve({}) },
+    );
+
+    await expect(gateway.charge(input())).rejects.toThrow(/422/);
+  });
+
+  it('copes with a poll response that carries no status at all', async () => {
+    const { gateway } = harness((url) => {
+      if (url.includes('/merchants/')) return ok(MERCHANT);
+      if (url.endsWith('/transactions')) return ok({ data: { id: 'txn_1' } });
+      return ok({});
+    });
+
+    expect((await gateway.charge(input())).result).toBe('ERROR');
+  });
 });
