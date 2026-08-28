@@ -12,12 +12,15 @@ number never reaches this API and is never stored here.
 |---|---|
 | Frontend | https://lucky-reels-andremovs-projects.vercel.app |
 | API | https://lucky-reels-api-andremovs-projects.vercel.app |
-| API docs (Swagger) | https://lucky-reels-api-andremovs-projects.vercel.app/docs |
-| API docs (Postman) | [`postman/lucky-reels.postman_collection.json`](postman/lucky-reels.postman_collection.json) |
+| API docs | [`postman/lucky-reels.postman_collection.json`](postman/lucky-reels.postman_collection.json) — import into Postman |
 
 These are stable production domains, not per-deployment URLs, so they survive
-redeploys. Each was checked signed-out: the frontend serves the app, `/health`
-returns `{"status":"ok","database":"up"}`, and `/docs` serves Swagger UI.
+redeploys. Each was checked signed-out: the frontend serves the app and
+`/health` returns `{"status":"ok","database":"up"}`.
+
+Use the Postman collection for the API reference. A Swagger page is mounted at
+`/docs`, but it does not currently render — its assets are blocked by the
+service's own content-security policy — so it is not linked here until it does.
 
 The Postman collection is runnable end to end, not a static dump: set `baseUrl`
 and `productId`, then run the **Checkout** folder in order. Creating a
