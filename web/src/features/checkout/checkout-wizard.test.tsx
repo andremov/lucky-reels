@@ -50,10 +50,13 @@ async function chooseStarterPack(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /review order/i }));
 }
 
+/** Opens the card modal, fills it and submits. */
 async function payWithCard(user: ReturnType<typeof userEvent.setup>, number = '4242424242424242') {
+  await user.click(screen.getByRole('button', { name: /pay with credit card/i }));
+  await screen.findByRole('dialog');
   await user.type(screen.getByLabelText(/card number/i), number);
   await fill(user, CARD);
-  await user.click(screen.getByRole('button', { name: /^pay/i }));
+  await user.click(screen.getByRole('button', { name: /^pay now$/i }));
 }
 
 beforeEach(() => {
@@ -155,9 +158,11 @@ describe('checkout wizard', () => {
     await user.click(screen.getByRole('button', { name: /confirm order/i }));
     await screen.findByRole('heading', { name: /^payment$/i });
 
+    await user.click(screen.getByRole('button', { name: /pay with credit card/i }));
+    await screen.findByRole('dialog');
     await user.type(screen.getByLabelText(/card number/i), '4242424242424241');
     await fill(user, CARD);
-    await user.click(screen.getByRole('button', { name: /^pay/i }));
+    await user.click(screen.getByRole('button', { name: /^pay now$/i }));
 
     expect(await screen.findByText(/card number is not valid/i)).toBeInTheDocument();
     expect(paySpy).not.toHaveBeenCalled();

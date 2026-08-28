@@ -4,6 +4,7 @@ import { payTransaction, stepChanged } from './checkout-slice';
 import { detectBrand, isValid, validateCard, type CardDraft, type Errors } from './validation';
 import { buildPaymentToken } from './payment-token';
 import AmountsTable from './amounts-table';
+import Modal from './modal';
 import { Button, ErrorNote, Field } from './ui';
 
 const EMPTY: CardDraft = { cardNumber: '', cardHolder: '', expiry: '', cvv: '' };
@@ -23,9 +24,16 @@ export default function StepPayment() {
   // into the store and never persisted.
   const [card, setCard] = useState<CardDraft>(EMPTY);
   const [errors, setErrors] = useState<Errors>({});
+  const [open, setOpen] = useState(false);
 
   const brand = detectBrand(card.cardNumber);
   const set = (patch: Partial<CardDraft>) => setCard((prev) => ({ ...prev, ...patch }));
+
+  const closeModal = () => {
+    setOpen(false);
+    setErrors({});
+    setCard(EMPTY); // Card details do not outlive the modal.
+  };
 
   const handlePay = () => {
     const found = validateCard(card);
@@ -35,9 +43,8 @@ export default function StepPayment() {
     // The real gateway tokenises in the browser; the card never reaches our API.
     const paymentToken = buildPaymentToken(card.cardNumber);
     setCard(EMPTY);
-    dispatch(
-      payTransaction({ paymentToken, acceptanceToken: 'acc_stub', installments: 1 }),
-    );
+    setOpen(false);
+    dispatch(payTransaction({ paymentToken, acceptanceToken: 'acc_stub', installments: 1 }));
   };
 
   return (
@@ -52,56 +59,75 @@ export default function StepPayment() {
 
       {amounts ? <AmountsTable amounts={amounts} /> : null}
 
-      <div className="flex flex-col gap-3">
-        <Field
-          label={`Card number${brand !== 'unknown' ? ` (${BRAND_LABEL[brand]})` : ''}`}
-          name="cardNumber"
-          inputMode="numeric"
-          autoComplete="cc-number"
-          value={card.cardNumber}
-          error={errors.cardNumber}
-          onChange={(e) => set({ cardNumber: e.target.value })}
-        />
-        <Field
-          label="Name on card"
-          name="cardHolder"
-          autoComplete="cc-name"
-          value={card.cardHolder}
-          error={errors.cardHolder}
-          onChange={(e) => set({ cardHolder: e.target.value })}
-        />
-        <div className="grid grid-cols-2 gap-3">
-          <Field
-            label="Expiry (MM/YY)"
-            name="expiry"
-            placeholder="12/30"
-            autoComplete="cc-exp"
-            value={card.expiry}
-            error={errors.expiry}
-            onChange={(e) => set({ expiry: e.target.value })}
-          />
-          <Field
-            label="CVV"
-            name="cvv"
-            inputMode="numeric"
-            autoComplete="cc-csc"
-            value={card.cvv}
-            error={errors.cvv}
-            onChange={(e) => set({ cvv: e.target.value })}
-          />
-        </div>
-      </div>
-
       {error ? <ErrorNote>{error.message}</ErrorNote> : null}
 
       <div className="flex gap-2">
         <Button variant="ghost" onClick={() => dispatch(stepChanged('summary'))}>
           Back
         </Button>
-        <Button disabled={submitting} onClick={handlePay}>
-          {submitting ? 'Sending…' : amounts ? 'Pay now' : 'Pay'}
+        <Button disabled={submitting} onClick={() => setOpen(true)}>
+          {submitting ? 'Sending…' : 'Pay with credit card'}
         </Button>
       </div>
+
+      {open ? (
+        <Modal title="Card details" onClose={closeModal}>
+          <div className="flex flex-col gap-3">
+            <Field
+              label={`Card number${brand !== 'unknown' ? ` (${BRAND_LABEL[brand]})` : ''}`}
+              name="cardNumber"
+              inputMode="numeric"
+              autoComplete="cc-number"
+              value={card.cardNumber}
+              error={errors.cardNumber}
+              onChange={(e) => set({ cardNumber: e.target.value })}
+            />
+            <Field
+              label="Name on card"
+              name="cardHolder"
+              autoComplete="cc-name"
+              value={card.cardHolder}
+              error={errors.cardHolder}
+              onChange={(e) => set({ cardHolder: e.target.value })}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <Field
+                label="Expiry (MM/YY)"
+                name="expiry"
+                placeholder="12/30"
+                autoComplete="cc-exp"
+                value={card.expiry}
+                error={errors.expiry}
+                onChange={(e) => set({ expiry: e.target.value })}
+              />
+              <Field
+                label="CVV"
+                name="cvv"
+                inputMode="numeric"
+                autoComplete="cc-csc"
+                value={card.cvv}
+                error={errors.cvv}
+                onChange={(e) => set({ cvv: e.target.value })}
+              />
+            </div>
+
+            {amounts ? (
+              <p className="text-sm text-white/60">
+                You are paying the total shown behind this dialog.
+              </p>
+            ) : null}
+
+            <div className="mt-1 flex gap-2">
+              <Button variant="ghost" onClick={closeModal}>
+                Cancel
+              </Button>
+              <Button disabled={submitting} onClick={handlePay}>
+                {submitting ? 'Sending…' : 'Pay now'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </section>
   );
 }
