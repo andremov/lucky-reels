@@ -1,9 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { resolveSpin, SPIN_COST, type Spin, type Symbol } from './spin';
 
-// TODO: credits should come from a completed checkout once that exists.
-export const DEV_STARTING_CREDITS = 20;
-
 export type GameState = {
   credits: number;
   reels: [Symbol, Symbol, Symbol];
@@ -13,7 +10,8 @@ export type GameState = {
 };
 
 const initialState: GameState = {
-  credits: DEV_STARTING_CREDITS,
+  // The machine starts empty: spins are bought through the checkout.
+  credits: 0,
   reels: ['cherry', 'lemon', 'bell'],
   status: 'idle',
   lastPayout: null,

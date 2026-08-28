@@ -33,9 +33,10 @@ transaction captures the `playerToken` once the payment is `APPROVED`, which the
 
 ## Trying it
 
-The deployed frontend talks to the deployed API. Buying a pack really creates a
-transaction, really reserves stock, and really grants credits you can spend on
-the reels.
+The deployed frontend talks to the deployed API. **The machine starts empty** —
+spins are bought, not given — so buying a pack really creates a transaction,
+really reserves stock, and really grants the credits that make the reels
+playable.
 
 Payments run against a **stub gateway**, so you can force any outcome from the
 card form. The branch is chosen by the payment token, which the browser builds
