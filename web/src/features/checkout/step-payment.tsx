@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { payTransaction, stepChanged } from './checkout-slice';
 import { detectBrand, isValid, validateCard, type CardDraft, type Errors } from './validation';
+import { buildPaymentToken } from './payment-token';
 import AmountsTable from './amounts-table';
 import { Button, ErrorNote, Field } from './ui';
 
@@ -32,7 +33,7 @@ export default function StepPayment() {
     if (!isValid(found)) return;
 
     // The real gateway tokenises in the browser; the card never reaches our API.
-    const paymentToken = `tok_stagtest_${brand}_${card.cardNumber.slice(-4)}`;
+    const paymentToken = buildPaymentToken(card.cardNumber);
     setCard(EMPTY);
     dispatch(
       payTransaction({ paymentToken, acceptanceToken: 'acc_stub', installments: 1 }),

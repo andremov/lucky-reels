@@ -30,6 +30,27 @@ transaction captures the `reference` into a collection variable, and polling the
 transaction captures the `playerToken` once the payment is `APPROVED`, which the
 **Game** requests then use automatically.
 
+## Trying it
+
+The deployed frontend talks to the deployed API. Buying a pack really creates a
+transaction, really reserves stock, and really grants credits you can spend on
+the reels.
+
+Payments run against a **stub gateway**, so you can force any outcome from the
+card form. The branch is chosen by the payment token, which the browser builds
+from the card number — use these test cards:
+
+| Card number | Outcome |
+|---|---|
+| `4242 4242 4242 4242` | `APPROVED` — credits granted, stock committed |
+| `4000 0000 0000 0002` | `DECLINED` — nothing charged, stock released |
+| `4000 0000 0000 0119` | `ERROR` — nothing charged, stock released |
+
+Any card passing the Luhn check works; expiry `12/30` and any 3-digit CVV are
+fine. Calling the API directly, the same rule applies to `paymentToken`: a token
+containing `decline` declines, one containing `error` errors, anything else
+approves. Case-insensitive, and `error` wins if a token asks for both.
+
 ## Stack
 
 - **Frontend** — React 19, Redux Toolkit, Tailwind v4, Vite. Mobile-first. No
@@ -71,11 +92,12 @@ cp .env.example .env    # optional
 npm run dev             # http://localhost:5173
 ```
 
-`VITE_API_URL` points the app at the API. **Leave it unset and the app runs
-against a complete in-memory stub** of the API — every checkout screen works
-end-to-end, including reservations, polling and settlement, with no backend
-running. That stub is the same interface the real client implements, so swapping
-between them touches one line.
+`VITE_API_URL` points the app at the API, and is set to the deployed API in
+production. **Leave it unset and the app runs against a complete in-memory
+stub** — every checkout screen works end to end, including reservations, polling
+and settlement, with no backend running. The stub implements the same interface
+as the real client, so switching between them is this one variable and no code
+change. Note Vite bakes it in at build time, so changing it needs a rebuild.
 
 ### Tests
 
@@ -100,13 +122,14 @@ Frontend, verified by `npm run test:cov` in `web/` with `tsc -b` clean:
 
 98 tests across 10 suites.
 
-Backend, verified by `npm run test:cov` in `api/` with `tsc -b` clean:
+Backend, verified by `npm run test:cov` in `api/` with `tsc -b --force` clean:
 
 | | Statements | Branches | Functions | Lines |
 |---|---|---|---|---|
-| All files | 86.22% | 85.71% | 93.42% | 84.41% |
+| All files | 87.05% | 81.41% | 83.41% | 86.78% |
 
-83 tests across 6 suites. Above 80% on every metric on both sides.
+222 tests across 21 suites. Above 80% on every metric on both sides, with no
+coverage exclusions.
 
 ## The checkout
 
@@ -140,6 +163,25 @@ on, so a tab that died at step 2 lands on the real outcome.
 **Stock can go up.** Reservations are released when someone else's payment
 fails, so a rising number is not a bug and product stock is never cached across
 screens.
+
+### Reservations and concurrency
+
+`POST /transactions` reserves stock; approval commits it, and a decline, an
+error or an expiry returns it. The invariant that matters is that the last unit
+cannot be sold twice, and it is proven rather than asserted: an integration test
+against a real database fires two concurrent reservations at a product with one
+unit left and asserts exactly one succeeds while the other gets `OUT_OF_STOCK`,
+leaving `available` at 0 and `reserved` at 1. Settling the same transaction
+twice leaves the first outcome standing.
+
+### Settlement
+
+The result screen polls `GET /transactions/{reference}` every 2s and stops at
+60s, showing pending copy rather than a failure — a slow settlement is not a
+failed one. Settlement is deliberately **polled, not webhook-driven**: a signed
+gateway callback needs a publicly reachable endpoint and secret verification
+that could not be honestly proven in the time available, so the webhook path is
+left unbuilt rather than half-built.
 
 ## Data model
 
@@ -234,6 +276,12 @@ given and cannot influence it.
 **Hexagonal architecture** on the API — domain logic sits behind ports, with
 adapters for HTTP, persistence and the gateway, so the database and the payment
 provider are swappable without touching use cases.
+
+**The payment gateway is a port, not a hard-coded call.** `PaymentGateway` is an
+interface with `StubGateway` as one implementation; swapping in a real provider
+is one adapter and one binding in the module, with no use case touched. The stub
+is a seam, not a shortcut — which is also why the outcome is steerable from a
+test card rather than random.
 
 **Railway-oriented programming** — a `Result`/`ResultAsync` type carries expected
 failures as values through the use-case layer instead of throwing, so every
