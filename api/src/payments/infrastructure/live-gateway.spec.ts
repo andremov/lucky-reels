@@ -150,23 +150,29 @@ describe('LiveGateway', () => {
     await expect(gateway.charge(input())).rejects.toThrow(String(POLL_BUDGET_MS));
   });
 
-  it('fetches the acceptance token once across two charges', async () => {
+  it('fetches a FRESH acceptance token for every charge', async () => {
+    const { gateway, calls } = harness(respondWith(['APPROVED']));
+
+    await gateway.charge(input());
+    await gateway.charge(input());
+    await gateway.charge(input());
+
+    // The token is single use. Caching it would let only the first payment of a
+    // process succeed and reject every one after it.
+    expect(calls.filter((c) => c.url.includes('/merchants/'))).toHaveLength(3);
+  });
+
+  it('fetches the acceptance token before creating each transaction, in order', async () => {
     const { gateway, calls } = harness(respondWith(['APPROVED']));
 
     await gateway.charge(input());
     await gateway.charge(input());
 
-    expect(calls.filter((c) => c.url.includes('/merchants/'))).toHaveLength(1);
-  });
+    const sequence = calls
+      .filter((c) => c.url.includes('/merchants/') || c.url.endsWith('/transactions'))
+      .map((c) => (c.url.includes('/merchants/') ? 'acceptance' : 'create'));
 
-  it('refetches the acceptance token once it has aged out', async () => {
-    const { gateway, calls, advance } = harness(respondWith(['APPROVED']));
-
-    await gateway.charge(input());
-    advance(11 * 60_000);
-    await gateway.charge(input());
-
-    expect(calls.filter((c) => c.url.includes('/merchants/'))).toHaveLength(2);
+    expect(sequence).toEqual(['acceptance', 'create', 'acceptance', 'create']);
   });
 
   it('throws before creating anything when the acceptance token cannot be fetched', async () => {

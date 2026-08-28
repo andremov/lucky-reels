@@ -16,7 +16,6 @@ export type LiveGatewayDeps = {
 
 export const POLL_INTERVAL_MS = 750;
 export const POLL_BUDGET_MS = 12_000;
-export const ACCEPTANCE_TTL_MS = 10 * 60_000;
 
 /** Their vocabulary is wider than ours. Anything unrecognised is not a success. */
 export function mapStatus(providerStatus: string): 'APPROVED' | 'DECLINED' | 'ERROR' | 'PENDING' {
@@ -67,7 +66,6 @@ export class LiveGateway implements PaymentGateway {
   private readonly http: typeof fetch;
   private readonly now: () => number;
   private readonly sleep: (ms: number) => Promise<void>;
-  private acceptance: { token: string; fetchedAt: number } | null = null;
 
   constructor(
     private readonly config: LiveGatewayConfig,
@@ -85,10 +83,13 @@ export class LiveGateway implements PaymentGateway {
     return this.pollUntilTerminal(id, input.reference);
   }
 
+  /**
+   * Fetched fresh for every charge. The token is single use: reusing one gets
+   * "El token de aceptación ya fue usado" and the transaction is refused before
+   * the card is considered, so a cache would let only the first payment of a
+   * process ever succeed.
+   */
   private async acceptanceToken(): Promise<string> {
-    const cached = this.acceptance;
-    if (cached && this.now() - cached.fetchedAt < ACCEPTANCE_TTL_MS) return cached.token;
-
     const response = await this.http(`${this.config.apiUrl}/merchants/${this.config.publicKey}`);
     if (!response.ok) {
       throw new GatewayUnavailableError(`merchant lookup returned ${response.status}`);
@@ -100,7 +101,6 @@ export class LiveGateway implements PaymentGateway {
     const token = body.data?.presigned_acceptance?.acceptance_token;
     if (!token) throw new GatewayUnavailableError('merchant lookup returned no acceptance token');
 
-    this.acceptance = { token, fetchedAt: this.now() };
     return token;
   }
 
