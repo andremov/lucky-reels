@@ -135,9 +135,9 @@ Backend, verified by `npm run test:cov` in `api/` with `tsc -b --force` clean:
 
 | | Statements | Branches | Functions | Lines |
 |---|---|---|---|---|
-| All files | 87.05% | 81.41% | 83.41% | 86.78% |
+| All files | 87.07% | 81.41% | 83.41% | 86.80% |
 
-222 tests across 21 suites. Above 80% on every metric on both sides, with no
+226 tests across 21 suites. Above 80% on every metric on both sides, with no
 coverage exclusions.
 
 ## The checkout
@@ -216,6 +216,16 @@ external payment provider. Substituting a real one is a new adapter and one
 binding in the module — no use case, controller or frontend code changes — but
 that adapter is not written, and this README should not be read as claiming a
 live provider integration.
+
+**Abandoned reservations are never released.** A pending transaction carries an
+`expiresAt`, and paying after it lapses is correctly refused — but nothing
+sweeps the expired ones, so the units they hold stay reserved indefinitely
+rather than returning to the shelf. In production that would let abandoned
+carts drain a catalogue over time. The fix is a scheduled job, or releasing
+lazily when stock is read; neither is built. It is a real gap in the backend
+rather than an oversight in the data, and it is recorded here for the same
+reason as the webhook: a limitation you can read is worth more than one you
+have to infer.
 
 ## Data model
 

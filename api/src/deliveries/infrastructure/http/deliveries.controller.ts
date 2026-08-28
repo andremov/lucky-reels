@@ -22,7 +22,10 @@ export class DeliveriesController {
   @Get(':reference')
   @ApiOperation({
     summary: 'Delivery for a transaction',
-    description: 'Assigned once the transaction is approved.',
+    description:
+      'Exists from the moment the transaction is created. status is PENDING while the ' +
+      'transaction is pending and becomes ASSIGNED once the payment is approved. ' +
+      'Returns 404 DELIVERY_NOT_FOUND only when the reference is unknown.',
   })
   @ApiOkResponse({ type: DeliveryResponse })
   async byReference(@Param('reference') reference: string): Promise<DeliveryResponse> {

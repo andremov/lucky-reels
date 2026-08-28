@@ -184,7 +184,7 @@
                 "{{reference}}"
               ]
             },
-            "description": "404 DELIVERY_NOT_FOUND before the transaction is approved."
+            "description": "The delivery exists from the moment the transaction is created. Its status is PENDING while the transaction is PENDING and becomes ASSIGNED once the payment is approved. 404 DELIVERY_NOT_FOUND only when the reference is unknown."
           },
           "response": []
         }
