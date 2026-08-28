@@ -52,6 +52,46 @@ const SCHEMA = `
     available int not null default 0 check (available >= 0),
     reserved int not null default 0 check (reserved >= 0)
   );
+  create table if not exists customers (
+    id uuid primary key default gen_random_uuid(),
+    email text not null unique,
+    full_name text not null,
+    phone text not null,
+    created_at timestamptz not null default now()
+  );
+
+  create table if not exists transactions (
+    id uuid primary key default gen_random_uuid(),
+    reference text not null unique,
+    customer_id uuid not null references customers(id),
+    product_id uuid not null references products(id),
+    quantity int not null check (quantity > 0),
+    amount_cents bigint not null,
+    base_fee_cents bigint not null,
+    delivery_fee_cents bigint not null,
+    total_cents bigint not null,
+    status text not null check (status in ('PENDING','APPROVED','DECLINED','ERROR')),
+    gateway_transaction_id text,
+    credits_granted int,
+    player_token text,
+    expires_at timestamptz not null,
+    settled_at timestamptz,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+  );
+
+  create index if not exists transactions_reference_idx on transactions(reference);
+
+  create table if not exists deliveries (
+    id uuid primary key default gen_random_uuid(),
+    transaction_id uuid not null unique references transactions(id) on delete cascade,
+    address_line text not null,
+    city text not null,
+    region text not null,
+    postal_code text not null,
+    fee_cents bigint not null,
+    status text not null default 'PENDING'
+  );
 `;
 
 function ssl() {

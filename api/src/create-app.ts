@@ -3,13 +3,21 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { corsOrigins } from './shared/http/cors-origins';
+import { toValidationEnvelope } from './shared/http/validation-envelope';
 
 export async function createApp(): Promise<INestApplication> {
   const app = await NestFactory.create(AppModule);
 
   app.use(helmet());
-  app.enableCors({ origin: corsOrigins(), credentials: false });
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.enableCors({ origin: corsOrigins(process.env.CORS_ORIGIN), credentials: false });
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      exceptionFactory: toValidationEnvelope,
+    }),
+  );
 
   const document = SwaggerModule.createDocument(
     app,
@@ -27,12 +35,4 @@ export async function createApp(): Promise<INestApplication> {
   SwaggerModule.setup('docs', app, document);
 
   return app;
-}
-
-function corsOrigins(): string[] | boolean {
-  const configured = process.env.CORS_ORIGIN?.trim();
-  if (!configured) return false;
-  if (configured === '*') return true;
-
-  return configured.split(',').map((origin) => origin.trim());
 }
