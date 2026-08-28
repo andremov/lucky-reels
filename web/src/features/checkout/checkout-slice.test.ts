@@ -32,13 +32,20 @@ const DELIVERY = {
   postalCode: '110111',
 };
 
-/** Drives a store from the product step to a created PENDING transaction. */
-async function advanceToPayment(store: ReturnType<typeof makeStore>, productId = 'prd_starter') {
+/** Product step -> a created PENDING transaction, which lands on the summary. */
+async function advanceToSummary(store: ReturnType<typeof makeStore>, productId = 'prd_starter') {
   await store.dispatch(loadProducts());
   store.dispatch(productSelected({ productId }));
   store.dispatch(customerChanged(CUSTOMER));
   store.dispatch(deliveryChanged(DELIVERY));
   await store.dispatch(createTransaction());
+  return store.getState().checkout;
+}
+
+/** As above, then on to the card step. */
+async function advanceToPayment(store: ReturnType<typeof makeStore>, productId = 'prd_starter') {
+  await advanceToSummary(store, productId);
+  store.dispatch(stepChanged('payment'));
   return store.getState().checkout;
 }
 
@@ -102,13 +109,13 @@ describe('checkout slice', () => {
   });
 
   describe('creating the transaction', () => {
-    it('stores the server reference and amounts and moves to payment', async () => {
+    it('stores the server reference and amounts and lands on the summary', async () => {
       const store = makeStore(createMockCheckoutClient());
-      const s = await advanceToPayment(store);
+      const s = await advanceToSummary(store);
 
       expect(s.reference).toMatch(/^LR-MOCK/);
       expect(s.status).toBe('PENDING');
-      expect(s.step).toBe('payment');
+      expect(s.step).toBe('summary');
       expect(s.expiresAt).toBeTruthy();
     });
 
@@ -125,6 +132,36 @@ describe('checkout slice', () => {
       });
       // The total is whatever the server said, not a re-derived sum.
       expect(amounts!.totalCents).toBe(2230000);
+    });
+
+    it('does not reserve twice for the same order', async () => {
+      const client = createMockCheckoutClient();
+      const spy = jest.spyOn(client, 'createTransaction');
+      const store = makeStore(client);
+
+      await advanceToSummary(store);
+      const first = state(store).reference;
+      await store.dispatch(createTransaction());
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(state(store).reference).toBe(first);
+    });
+
+    it('reserves afresh when the customer switches pack', async () => {
+      const client = createMockCheckoutClient();
+      const spy = jest.spyOn(client, 'createTransaction');
+      const store = makeStore(client);
+
+      await advanceToSummary(store);
+      const first = state(store).reference;
+
+      store.dispatch(productSelected({ productId: 'prd_high_roller' }));
+      expect(state(store).reference).toBeNull();
+      expect(state(store).amounts).toBeNull();
+
+      await store.dispatch(createTransaction());
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect(state(store).reference).not.toBe(first);
     });
 
     it('refuses to submit with no product selected', async () => {

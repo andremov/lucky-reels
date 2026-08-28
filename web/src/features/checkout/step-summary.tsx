@@ -1,11 +1,11 @@
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import { createTransaction, stepChanged } from './checkout-slice';
-import { formatCents } from './money';
+import { stepChanged } from './checkout-slice';
+import AmountsTable from './amounts-table';
 import { Button, ErrorNote } from './ui';
 
 export default function StepSummary() {
   const dispatch = useAppDispatch();
-  const { products, selectedProductId, quantity, customer, delivery, submitting, error } =
+  const { products, selectedProductId, quantity, customer, delivery, amounts, reference, error } =
     useAppSelector((s) => s.checkout);
 
   const product = products.find((p) => p.id === selectedProductId);
@@ -25,10 +25,6 @@ export default function StepSummary() {
           <div className="flex justify-between">
             <dt className="text-white/60">Spins</dt>
             <dd>{product.spinsGranted * quantity}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-white/60">Price</dt>
-            <dd>{formatCents(product.priceCents, product.currency)}</dd>
           </div>
         </dl>
       ) : null}
@@ -51,13 +47,16 @@ export default function StepSummary() {
       </dl>
 
       {/*
-        Fees are not shown yet on purpose. The server computes them and returns
-        them with the transaction, so the breakdown appears on the next step
-        rather than being guessed at here.
+        Product amount, base fee and delivery fee, exactly as the server
+        computed them when it reserved the stock. Nothing here is summed.
       */}
-      <p className="text-xs text-white/50">
-        Base and delivery fees are calculated when you confirm, and shown before you pay.
-      </p>
+      {amounts ? <AmountsTable amounts={amounts} /> : null}
+
+      {reference ? (
+        <p className="text-xs text-white/50">
+          Reference <span className="font-mono text-white/80">{reference}</span>
+        </p>
+      ) : null}
 
       {error ? <ErrorNote>{error.message}</ErrorNote> : null}
 
@@ -65,8 +64,11 @@ export default function StepSummary() {
         <Button variant="ghost" onClick={() => dispatch(stepChanged('details'))}>
           Back
         </Button>
-        <Button disabled={submitting || !product} onClick={() => dispatch(createTransaction())}>
-          {submitting ? 'Reserving…' : 'Confirm order'}
+        {/* Leads to the payment step, which owns the "Pay with credit card"
+            button and the card modal. Two identical labels in a row would be
+            worse than one clear one. */}
+        <Button disabled={!amounts} onClick={() => dispatch(stepChanged('payment'))}>
+          Continue to payment
         </Button>
       </div>
     </section>

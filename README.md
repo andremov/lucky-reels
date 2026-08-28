@@ -146,22 +146,29 @@ Five steps, each a distinct screen backed by one Redux slice.
 
 1. **Pack** — choose a pack. Stock is refetched on every visit.
 2. **Details** — name, email, phone, delivery address, validated per field.
-3. **Review** — confirm the order. Creates the transaction as `PENDING` and
-   reserves stock.
-4. **Payment** — card details, validated locally (Luhn, brand-aware CVV length,
-   expiry) before anything is sent.
+   Continuing creates the transaction as `PENDING` and reserves the stock.
+3. **Review** — the order alongside the product amount, base fee, delivery fee
+   and total exactly as the server computed them.
+4. **Payment** — a *Pay with credit card* button opens a modal for the card,
+   validated locally (Luhn, brand-aware CVV length, expiry) before anything is
+   sent.
 5. **Result** — polls until the gateway decides, then reports the outcome and
    credits the spins.
 
 Three behaviours are worth calling out, because each is a place the obvious
 implementation is wrong:
 
-**The server computes the fees, and the client never adds anything up.** Step 3
-shows no total at all. Base and delivery fees are returned by
-`POST /transactions` alongside the product amount and the total, and the
-breakdown is rendered verbatim from that response on step 4. Summing the parts
-client-side would eventually show a customer a figure different from the one
-they were charged.
+**The server computes the fees, and the client never adds anything up.** Base
+and delivery fees come back from `POST /transactions` alongside the product
+amount and the total, and the summary renders that response verbatim. This is
+why the reservation happens on the way *into* the summary rather than on the way
+out — the figures cannot be shown before the server has produced them, and
+summing the parts locally would eventually show a customer a total different
+from the one they were charged.
+
+Stepping back to edit and returning reuses the existing reservation rather than
+taking a second one; changing pack or quantity discards it and reserves afresh,
+leaving the abandoned one to lapse at `expiresAt`.
 
 **`reference` is the idempotency key and is persisted the instant it returns.**
 That is what makes a refresh resumable and what stops a retried payment charging

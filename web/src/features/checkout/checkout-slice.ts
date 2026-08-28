@@ -32,6 +32,8 @@ export type CheckoutState = {
   customer: Partial<Customer>;
   delivery: Partial<Delivery>;
   reference: string | null;
+  /** What the current reference actually reserved, so we never reserve twice. */
+  reservedFor: { productId: string; quantity: number } | null;
   amounts: Amounts | null;
   expiresAt: string | null;
   status: TransactionStatus | null;
@@ -52,6 +54,7 @@ const initialState: CheckoutState = {
   customer: {},
   delivery: {},
   reference: null,
+  reservedFor: null,
   amounts: null,
   expiresAt: null,
   status: null,
@@ -90,7 +93,9 @@ export const createTransaction = createAsyncThunk<
   { reference: string; status: TransactionStatus; amounts: Amounts; expiresAt: string },
   void,
   { extra: ThunkExtra; state: { checkout: CheckoutState }; rejectValue: CheckoutError }
->('checkout/createTransaction', async (_, { extra, getState, rejectWithValue }) => {
+>(
+  'checkout/createTransaction',
+  async (_, { extra, getState, rejectWithValue }) => {
   const { selectedProductId, quantity, customer, delivery } = getState().checkout;
   if (!selectedProductId) {
     return rejectWithValue({
@@ -106,11 +111,26 @@ export const createTransaction = createAsyncThunk<
       customer: customer as Customer,
       delivery: delivery as Delivery,
     });
-    return { ...created, status: normalizeStatus(created.status) };
-  } catch (error) {
-    return rejectWithValue(toCheckoutError(error));
-  }
-});
+      return { ...created, status: normalizeStatus(created.status) };
+    } catch (error) {
+      return rejectWithValue(toCheckoutError(error));
+    }
+  },
+  {
+    // Stepping back to edit and returning must not reserve a second time.
+    condition: (_arg, { getState }) => {
+      const { reference, reservedFor, selectedProductId, quantity } = (
+        getState() as { checkout: CheckoutState }
+      ).checkout;
+      const alreadyReserved =
+        reference !== null &&
+        reservedFor !== null &&
+        reservedFor.productId === selectedProductId &&
+        reservedFor.quantity === quantity;
+      return !alreadyReserved;
+    },
+  },
+);
 
 export const payTransaction = createAsyncThunk<
   void,
@@ -159,9 +179,25 @@ const checkoutSlice = createSlice({
       state.error = null;
     },
     productSelected(state, action: PayloadAction<{ productId: string; quantity?: number }>) {
-      state.selectedProductId = action.payload.productId;
-      state.quantity = action.payload.quantity ?? 1;
+      const productId = action.payload.productId;
+      const quantity = action.payload.quantity ?? 1;
+      const changed =
+        state.reservedFor !== null &&
+        (state.reservedFor.productId !== productId || state.reservedFor.quantity !== quantity);
+
+      state.selectedProductId = productId;
+      state.quantity = quantity;
       state.error = null;
+
+      // A different pack means the old reservation no longer describes this
+      // order. Drop it and reserve afresh; the abandoned one lapses at expiry.
+      if (changed) {
+        state.reference = null;
+        state.reservedFor = null;
+        state.amounts = null;
+        state.expiresAt = null;
+        state.status = null;
+      }
     },
     customerChanged(state, action: PayloadAction<Partial<Customer>>) {
       state.customer = { ...state.customer, ...action.payload };
@@ -215,7 +251,10 @@ const checkoutSlice = createSlice({
         state.status = action.payload.status;
         state.amounts = action.payload.amounts;
         state.expiresAt = action.payload.expiresAt;
-        state.step = 'payment';
+        state.reservedFor = { productId: state.selectedProductId!, quantity: state.quantity };
+        // The summary can only show server-computed fees once they exist, so
+        // the reservation happens on the way in rather than on the way out.
+        state.step = 'summary';
       })
       .addCase(createTransaction.rejected, (state, action) => {
         state.submitting = false;
@@ -287,6 +326,7 @@ export const checkoutReducer = checkoutSlice.reducer;
 export function toPersisted(state: CheckoutState) {
   return {
     reference: state.reference,
+    reservedFor: state.reservedFor,
     step: stepIndex(state.step),
     productId: state.selectedProductId,
     quantity: state.quantity,

@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import { customerChanged, deliveryChanged, stepChanged } from './checkout-slice';
+import { createTransaction, customerChanged, deliveryChanged } from './checkout-slice';
+import { stepChanged } from './checkout-slice';
 import { isValid, validateDetails, type Errors } from './validation';
-import { Button, Field } from './ui';
+import { Button, ErrorNote, Field } from './ui';
 
 export default function StepDetails() {
   const dispatch = useAppDispatch();
-  const { customer, delivery, error } = useAppSelector((s) => s.checkout);
+  const { customer, delivery, error, submitting, reference, reservedFor, selectedProductId, quantity } =
+    useAppSelector((s) => s.checkout);
   const [errors, setErrors] = useState<Errors>({});
 
   // The API reports field errors with the same dotted paths this form uses
@@ -21,7 +23,23 @@ export default function StepDetails() {
   const handleContinue = () => {
     const found = validateDetails(customer, delivery);
     setErrors(found);
-    if (isValid(found)) dispatch(stepChanged('summary'));
+    if (!isValid(found)) return;
+
+    const alreadyReserved =
+      reference !== null &&
+      reservedFor !== null &&
+      reservedFor.productId === selectedProductId &&
+      reservedFor.quantity === quantity;
+
+    if (alreadyReserved) {
+      // Came back to edit and nothing about the order changed: reuse the
+      // existing reservation rather than taking a second one.
+      dispatch(stepChanged('summary'));
+      return;
+    }
+
+    // Reserves stock and returns the server-computed fees the summary needs.
+    dispatch(createTransaction());
   };
 
   return (
@@ -83,11 +101,17 @@ export default function StepDetails() {
         />
       </div>
 
+      {/* Reserving happens here now, so refusals like OUT_OF_STOCK surface on
+          this step. Field-level problems are shown on the inputs instead. */}
+      {error && error.code !== 'VALIDATION_FAILED' ? <ErrorNote>{error.message}</ErrorNote> : null}
+
       <div className="flex gap-2">
         <Button variant="ghost" onClick={() => dispatch(stepChanged('product'))}>
           Back
         </Button>
-        <Button onClick={handleContinue}>Review order</Button>
+        <Button disabled={submitting} onClick={handleContinue}>
+          {submitting ? 'Reserving…' : 'Review order'}
+        </Button>
       </div>
     </section>
   );

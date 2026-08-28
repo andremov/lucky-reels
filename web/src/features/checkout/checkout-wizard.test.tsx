@@ -130,20 +130,41 @@ describe('checkout wizard', () => {
     expect(await screen.findByText(/that email looks wrong/i)).toBeInTheDocument();
   });
 
-  it('reviews the order without inventing a total', async () => {
+  it('shows the server-computed amounts on the summary', async () => {
     const { user } = setup();
     await chooseStarterPack(user);
 
     expect(await screen.findByRole('heading', { name: /check your order/i })).toBeInTheDocument();
     expect(screen.getByText(/someone@example\.com/)).toBeInTheDocument();
-    // Fees are the server's to compute, so no total is shown yet.
-    expect(screen.queryByTestId('total')).not.toBeInTheDocument();
+    // Product amount, base fee and delivery fee, straight from the API.
+    expect(screen.getByText('$ 20.000,00')).toBeInTheDocument();
+    expect(screen.getByText('$ 1.500,00')).toBeInTheDocument();
+    expect(screen.getByText('$ 800,00')).toBeInTheDocument();
+    expect(screen.getByTestId('total')).toHaveTextContent('22.300,00');
   });
 
-  it('renders the server-computed amounts on the payment step', async () => {
+  it('reserves once when the customer steps back and returns', async () => {
+    const client = createMockCheckoutClient();
+    const spy = jest.spyOn(client, 'createTransaction');
+    const { user } = setup(client);
+
+    await chooseStarterPack(user);
+    const first = screen.getByText(/LR-MOCK/).textContent;
+
+    await user.click(screen.getByRole('button', { name: /^back$/i }));
+    await screen.findByRole('heading', { name: /where should it go/i });
+    await user.click(screen.getByRole('button', { name: /review order/i }));
+    await screen.findByRole('heading', { name: /check your order/i });
+
+    // Same reservation reused; no second PENDING transaction holding stock.
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/LR-MOCK/).textContent).toBe(first);
+  });
+
+  it('repeats the amounts on the payment step', async () => {
     const { user } = setup();
     await chooseStarterPack(user);
-    await user.click(screen.getByRole('button', { name: /confirm order/i }));
+    await user.click(screen.getByRole('button', { name: /continue to payment/i }));
 
     expect(await screen.findByRole('heading', { name: /^payment$/i })).toBeInTheDocument();
     // 20.000 + 1.500 + 800 = 22.300, and it comes from the API, not from us.
@@ -155,7 +176,7 @@ describe('checkout wizard', () => {
     const { user, client } = setup();
     const paySpy = jest.spyOn(client, 'pay');
     await chooseStarterPack(user);
-    await user.click(screen.getByRole('button', { name: /confirm order/i }));
+    await user.click(screen.getByRole('button', { name: /continue to payment/i }));
     await screen.findByRole('heading', { name: /^payment$/i });
 
     await user.click(screen.getByRole('button', { name: /pay with credit card/i }));
@@ -171,7 +192,7 @@ describe('checkout wizard', () => {
   it('completes the five steps and reports approval', async () => {
     const { user } = setup();
     await chooseStarterPack(user);
-    await user.click(screen.getByRole('button', { name: /confirm order/i }));
+    await user.click(screen.getByRole('button', { name: /continue to payment/i }));
     await screen.findByRole('heading', { name: /^payment$/i });
     await payWithCard(user);
 
@@ -184,7 +205,7 @@ describe('checkout wizard', () => {
     const before = store.getState().game.credits;
 
     await chooseStarterPack(user);
-    await user.click(screen.getByRole('button', { name: /confirm order/i }));
+    await user.click(screen.getByRole('button', { name: /continue to payment/i }));
     await screen.findByRole('heading', { name: /^payment$/i });
     await payWithCard(user);
 
@@ -199,7 +220,7 @@ describe('checkout wizard', () => {
     const before = store.getState().game.credits;
 
     await chooseStarterPack(user);
-    await user.click(screen.getByRole('button', { name: /confirm order/i }));
+    await user.click(screen.getByRole('button', { name: /continue to payment/i }));
     await screen.findByRole('heading', { name: /^payment$/i });
     await payWithCard(user);
 
@@ -207,7 +228,7 @@ describe('checkout wizard', () => {
     expect(store.getState().game.credits).toBe(before);
   });
 
-  it('surfaces an out-of-stock refusal on the review step', async () => {
+  it('refuses to reach the summary when the pack is out of stock', async () => {
     const client = createMockCheckoutClient();
     jest
       .spyOn(client, 'createTransaction')
@@ -215,10 +236,13 @@ describe('checkout wizard', () => {
     const { user } = setup(client);
 
     await chooseStarterPack(user);
-    await user.click(screen.getByRole('button', { name: /confirm order/i }));
 
+    // The reservation is what produces the summary's figures, so a refusal
+    // keeps the customer on the details step rather than showing a priceless
+    // summary.
     expect(await screen.findByText(/only 2 packs left/i)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /check your order/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /where should it go/i })).toBeInTheDocument();
+    expect(screen.queryByTestId('total')).not.toBeInTheDocument();
   });
 
   it('lands a server field rejection on the offending input, not a banner', async () => {
@@ -232,9 +256,8 @@ describe('checkout wizard', () => {
     const { user } = setup(client);
 
     await chooseStarterPack(user);
-    await user.click(screen.getByRole('button', { name: /confirm order/i }));
 
-    // Back on the details form, with the message attached to the email field.
+    // Held on the details form, with the message attached to the email field.
     expect(await screen.findByRole('heading', { name: /where should it go/i })).toBeInTheDocument();
     const email = screen.getByLabelText(/email/i);
     expect(email).toHaveAccessibleDescription('email must be an email');
@@ -244,7 +267,7 @@ describe('checkout wizard', () => {
   it('never writes card details to storage', async () => {
     const { user } = setup();
     await chooseStarterPack(user);
-    await user.click(screen.getByRole('button', { name: /confirm order/i }));
+    await user.click(screen.getByRole('button', { name: /continue to payment/i }));
     await screen.findByRole('heading', { name: /^payment$/i });
     await payWithCard(user);
     await screen.findByRole('heading', { name: /payment approved/i });

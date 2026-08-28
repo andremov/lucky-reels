@@ -9,6 +9,7 @@ const KEY = 'lucky-reels.checkout.v1';
  */
 export type PersistedCheckout = {
   reference: string | null;
+  reservedFor?: { productId: string; quantity: number } | null;
   step: number;
   productId: string | null;
   quantity: number;
