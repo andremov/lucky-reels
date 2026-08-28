@@ -20,6 +20,10 @@ export async function createApp(): Promise<INestApplication> {
       .addBearerAuth()
       .build(),
   );
+  // Swagger's assets are not served from a serverless bundle, so the page loads
+  // and the UI never boots. They are copied into public/docs at build time and
+  // served as static files from the same origin, which the default script tags
+  // already point at and which Helmet's script-src 'self' allows.
   SwaggerModule.setup('docs', app, document);
 
   return app;

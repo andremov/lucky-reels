@@ -1,2 +1,5 @@
 .vercel
 .env*
+
+# Swagger assets are copied in by the build
+public/docs/
