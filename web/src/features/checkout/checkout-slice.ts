@@ -134,7 +134,7 @@ export const createTransaction = createAsyncThunk<
 
 export const payTransaction = createAsyncThunk<
   void,
-  { paymentToken: string; acceptanceToken: string; installments: number },
+  { paymentToken: string; acceptanceToken?: string; installments: number },
   { extra: ThunkExtra; state: { checkout: CheckoutState }; rejectValue: CheckoutError }
 >('checkout/pay', async (input, { extra, getState, rejectWithValue }) => {
   const { reference } = getState().checkout;
