@@ -139,6 +139,31 @@ describe('http checkout client', () => {
       expect(error.details).toEqual([{ field: 'customer.email', message: 'must be an email' }]);
     });
 
+    it('surfaces a malformed id as VALIDATION_FAILED with the offending field', async () => {
+      // Mirrors the live API: GET /products/not-a-uuid answers 400 with the
+      // envelope, so this is a distinguishable case rather than a generic fallback.
+      mockFetch([
+        {
+          ok: false,
+          status: 400,
+          body: {
+            error: {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid request',
+              details: [{ field: 'id', message: 'must be a uuid' }],
+            },
+          },
+        },
+      ]);
+      const client = createHttpCheckoutClient(BASE);
+
+      const error = await client.getProduct('not-a-uuid').catch((e) => e);
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error.code).toBe('VALIDATION_FAILED');
+      expect(error.status).toBe(400);
+      expect(error.details).toEqual([{ field: 'id', message: 'must be a uuid' }]);
+    });
+
     it('falls back to INTERNAL_ERROR when the body is not the envelope', async () => {
       mockFetch([{ ok: false, status: 502, body: { nope: true } }]);
       const client = createHttpCheckoutClient(BASE);
