@@ -1,4 +1,5 @@
 import type { Result } from '../../shared/result/result';
+import type { ChargeOutcome } from '../../payments/domain/payment-gateway';
 import type { TransactionError, TransactionView } from '../domain/transaction';
 
 export type CustomerInput = {
@@ -30,6 +31,17 @@ export interface TransactionRepository {
   createPending(input: CreateTransactionInput): Promise<Result<TransactionView, TransactionError>>;
 
   findByReference(reference: string): Promise<TransactionView | null>;
+
+  /**
+   * Applies a gateway outcome under a row lock. Committing the reservation,
+   * granting credits and marking the transaction settled are one unit of work,
+   * and a transaction that is already settled is returned untouched so a
+   * retried payment cannot pay twice.
+   */
+  settle(
+    reference: string,
+    outcome: ChargeOutcome,
+  ): Promise<Result<TransactionView, TransactionError>>;
 }
 
 export const TRANSACTION_REPOSITORY = Symbol('TransactionRepository');

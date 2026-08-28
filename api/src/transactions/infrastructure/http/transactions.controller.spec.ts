@@ -53,7 +53,27 @@ describe('toHttpError', () => {
     const thrown = thrownBy({ code: 'OUT_OF_STOCK', message: 'Only 2 left', available: 2 });
 
     expect((thrown as ConflictException).getResponse()).toEqual({
-      error: { code: 'OUT_OF_STOCK', message: 'Only 2 left', available: 2 },
+      error: { code: 'OUT_OF_STOCK', message: 'Only 2 left' },
     });
+  });
+
+  it('keeps internal context out of the envelope so the shape never varies', () => {
+    const thrown = thrownBy({ code: 'OUT_OF_STOCK', message: 'Only 2 left', available: 2 });
+    const body = (thrown as ConflictException).getResponse() as { error: Record<string, unknown> };
+
+    expect(Object.keys(body.error).sort()).toEqual(['code', 'message']);
+  });
+
+  it('carries details through for a validation failure, which the contract documents', () => {
+    const thrown = thrownBy({
+      code: 'VALIDATION_FAILED',
+      message: 'Invalid request',
+      details: [{ field: 'quantity', message: 'too small' }],
+    });
+    const body = (thrown as ConflictException).getResponse() as {
+      error: { details?: unknown };
+    };
+
+    expect(body.error.details).toEqual([{ field: 'quantity', message: 'too small' }]);
   });
 });

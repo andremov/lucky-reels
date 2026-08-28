@@ -10,11 +10,19 @@ import {
   Param,
   Post,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiAcceptedResponse,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CreateTransaction } from '../../application/create-transaction';
+import { PayTransaction } from '../../application/pay-transaction';
 import { GetTransaction } from '../../application/get-transaction';
 import type { TransactionError, TransactionView } from '../../domain/transaction';
 import { CreateTransactionDto } from './create-transaction.dto';
+import { PayTransactionDto } from './pay-transaction.dto';
 import { TransactionResponse } from './transaction.response';
 
 @ApiTags('Transactions')
@@ -23,6 +31,7 @@ export class TransactionsController {
   constructor(
     private readonly createTransaction: CreateTransaction,
     private readonly getTransaction: GetTransaction,
+    private readonly payTransaction: PayTransaction,
   ) {}
 
   @Post()
@@ -36,6 +45,28 @@ export class TransactionsController {
   @ApiCreatedResponse({ type: TransactionResponse })
   async create(@Body() body: CreateTransactionDto): Promise<TransactionView> {
     const result = await this.createTransaction.execute(body);
+
+    return result.match({ ok: (transaction) => transaction, err: toHttpError });
+  }
+
+  @Post(':reference/pay')
+  @HttpCode(202)
+  @ApiOperation({
+    summary: 'Submit payment for a transaction',
+    description:
+      'Hands the gateway token over. Accepted, not decided: poll the transaction for the ' +
+      'outcome. Safe to retry with the same reference; a settled transaction is returned as is.',
+  })
+  @ApiAcceptedResponse({ type: TransactionResponse })
+  async pay(
+    @Param('reference') reference: string,
+    @Body() body: PayTransactionDto,
+  ): Promise<TransactionView> {
+    const result = await this.payTransaction.execute({
+      reference,
+      paymentToken: body.paymentToken,
+      installments: body.installments ?? 1,
+    });
 
     return result.match({ ok: (transaction) => transaction, err: toHttpError });
   }
@@ -54,7 +85,16 @@ export class TransactionsController {
 }
 
 export function toHttpError(error: TransactionError): never {
-  const body = { error };
+  // The envelope is code + message, plus details only where the contract says
+  // so. Domain errors carry extra context for our own use; it does not leak out
+  // and make the error shape vary per endpoint.
+  const body = {
+    error: {
+      code: error.code,
+      message: error.message,
+      ...('details' in error ? { details: error.details } : {}),
+    },
+  };
 
   switch (error.code) {
     case 'PRODUCT_NOT_FOUND':

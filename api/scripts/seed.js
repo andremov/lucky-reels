@@ -82,6 +82,13 @@ const SCHEMA = `
 
   create index if not exists transactions_reference_idx on transactions(reference);
 
+  create table if not exists balances (
+    id uuid primary key default gen_random_uuid(),
+    customer_id uuid not null unique references customers(id) on delete cascade,
+    credits int not null default 0 check (credits >= 0),
+    updated_at timestamptz not null default now()
+  );
+
   create table if not exists deliveries (
     id uuid primary key default gen_random_uuid(),
     transaction_id uuid not null unique references transactions(id) on delete cascade,

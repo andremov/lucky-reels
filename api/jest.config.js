@@ -6,5 +6,6 @@ module.exports = {
   moduleNameMapper: { '^@/(.*)$': '<rootDir>/$1' },
   collectCoverageFrom: ['**/*.ts', '!**/*.spec.ts', '!main.ts'],
   coverageDirectory: '../coverage',
+  setupFiles: ['dotenv/config'],
   testEnvironment: 'node',
 };

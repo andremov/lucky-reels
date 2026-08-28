@@ -1,4 +1,5 @@
 import { ok, type Result } from '../../shared/result/result';
+import type { ChargeOutcome } from '../../payments/domain/payment-gateway';
 import {
   computeAmounts,
   expiryFrom,
@@ -51,6 +52,34 @@ export class FakeTransactionRepository implements TransactionRepository {
   findByReference(reference: string): Promise<TransactionView | null> {
     return Promise.resolve(this.stored.find((t) => t.reference === reference) ?? null);
   }
+
+  readonly settled: { reference: string; outcome: ChargeOutcome }[] = [];
+
+  settle(
+    reference: string,
+    outcome: ChargeOutcome,
+  ): Promise<Result<TransactionView, TransactionError>> {
+    this.settled.push({ reference, outcome });
+
+    const status =
+      outcome.result === 'APPROVED'
+        ? 'APPROVED'
+        : outcome.result === 'DECLINED'
+          ? 'DECLINED'
+          : 'ERROR';
+
+    return Promise.resolve(
+      ok(
+        aTransaction({
+          reference,
+          status,
+          ...(outcome.result === 'APPROVED'
+            ? { creditsGranted: 20, playerToken: 'plr_test', settledAt: '2026-08-28T00:00:00.000Z' }
+            : { settledAt: '2026-08-28T00:00:00.000Z' }),
+        }),
+      ),
+    );
+  }
 }
 
 export class FailingTransactionRepository implements TransactionRepository {
@@ -61,6 +90,10 @@ export class FailingTransactionRepository implements TransactionRepository {
   }
 
   findByReference(): Promise<TransactionView | null> {
+    return Promise.reject(this.reason);
+  }
+
+  settle(): Promise<Result<TransactionView, TransactionError>> {
     return Promise.reject(this.reason);
   }
 }

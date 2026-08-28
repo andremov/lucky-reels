@@ -1,14 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, type QueryRunner } from 'typeorm';
+import { randomBytes } from 'node:crypto';
 import { err, ok, type Result } from '../../../shared/result/result';
+import type { ChargeOutcome } from '../../../payments/domain/payment-gateway';
 import { Stock } from '../../../stock/domain/stock';
+import { planSettlement } from '../../domain/settlement';
 import {
   computeAmounts,
   expiryFrom,
   generateReference,
   outOfStock,
   productNotFound,
+  transactionNotFound,
   type TransactionError,
   type TransactionStatus,
   type TransactionView,
@@ -152,7 +156,118 @@ export class TypeormTransactionRepository implements TransactionRepository {
     return rows[0].id;
   }
 
-  async findByReference(reference: string): Promise<TransactionView | null> {
+  async settle(
+    reference: string,
+    outcome: ChargeOutcome,
+  ): Promise<Result<TransactionView, TransactionError>> {
+    const runner = this.dataSource.createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+
+    try {
+      const applied = await this.applyOutcome(runner, reference, outcome);
+
+      if (applied.isErr()) {
+        await runner.rollbackTransaction();
+        return applied;
+      }
+
+      await runner.commitTransaction();
+      return applied;
+    } catch (error) {
+      await runner.rollbackTransaction();
+      throw error;
+    } finally {
+      await runner.release();
+    }
+  }
+
+  private async applyOutcome(
+    runner: QueryRunner,
+    reference: string,
+    outcome: ChargeOutcome,
+  ): Promise<Result<TransactionView, TransactionError>> {
+    const rows: {
+      id: string;
+      status: TransactionStatus;
+      quantity: number;
+      product_id: string;
+      customer_id: string;
+      spins_granted: number;
+    }[] = await runner.query(
+      `select t.id, t.status, t.quantity, t.product_id, t.customer_id, p.spins_granted
+         from transactions t
+         join products p on p.id = t.product_id
+        where t.reference = $1
+          for update of t`,
+      [reference],
+    );
+
+    const row = rows[0];
+    if (!row) return err(transactionNotFound(reference));
+
+    // Someone settled it between the use case reading it and this lock. Return
+    // what it became rather than settling twice.
+    if (row.status !== 'PENDING') {
+      const current = await this.readByReference(runner, reference);
+      return current ? ok(current) : err(transactionNotFound(reference));
+    }
+
+    const stockRows: { available: number; reserved: number }[] = await runner.query(
+      'select available, reserved from stock where product_id = $1 for update',
+      [row.product_id],
+    );
+    const current = stockRows[0] ?? { available: 0, reserved: 0 };
+    const stock = Stock.from({
+      productId: row.product_id,
+      available: current.available,
+      reserved: current.reserved,
+    });
+
+    const plan = planSettlement(outcome, row.quantity, row.spins_granted);
+    const moved =
+      plan.stockMove === 'commit' ? stock.commit(row.quantity) : stock.release(row.quantity);
+    const next = moved.isOk() ? moved.value : stock;
+
+    await runner.query('update stock set available = $1, reserved = $2 where product_id = $3', [
+      next.available,
+      next.reserved,
+      row.product_id,
+    ]);
+
+    const credits = plan.creditsGranted;
+    const playerToken = plan.issuePlayerToken ? `plr_${randomBytes(16).toString('hex')}` : null;
+
+    await runner.query(
+      `update transactions
+          set status = $1, gateway_transaction_id = $2, credits_granted = $3,
+              player_token = $4, settled_at = now(), updated_at = now()
+        where id = $5`,
+      [plan.status, plan.gatewayTransactionId, credits, playerToken, row.id],
+    );
+
+    if (credits !== null) {
+      await runner.query(
+        `insert into balances (customer_id, credits)
+         values ($1, $2)
+         on conflict (customer_id) do update
+           set credits = balances.credits + excluded.credits, updated_at = now()`,
+        [row.customer_id, credits],
+      );
+    }
+
+    const view = await this.readByReference(runner, reference);
+    return view ? ok(view) : err(transactionNotFound(reference));
+  }
+
+  findByReference(reference: string): Promise<TransactionView | null> {
+    return this.readByReference(this.dataSource, reference);
+  }
+
+  private async readByReference(
+    runnerOrSource: { query: (sql: string, params: unknown[]) => Promise<unknown[]> },
+    reference: string,
+  ): Promise<TransactionView | null> {
     const rows: {
       reference: string;
       status: TransactionStatus;
@@ -168,7 +283,7 @@ export class TypeormTransactionRepository implements TransactionRepository {
       product_id: string;
       product_name: string;
       spins_granted: number;
-    }[] = await this.dataSource.query(
+    }[] = (await runnerOrSource.query(
       `select t.reference, t.status, t.quantity, t.amount_cents, t.base_fee_cents,
               t.delivery_fee_cents, t.total_cents, t.credits_granted, t.player_token,
               t.settled_at, t.expires_at,
@@ -177,7 +292,7 @@ export class TypeormTransactionRepository implements TransactionRepository {
          join products p on p.id = t.product_id
         where t.reference = $1`,
       [reference],
-    );
+    )) as never;
 
     const row = rows[0];
     if (!row) return null;
