@@ -1,0 +1,306 @@
+{
+  "info": {
+    "name": "Lucky Reels API",
+    "description": "Lucky Reels API.\n\nSet `baseUrl` and `productId`, then run the Checkout folder in order: Create transaction saves `reference` automatically, and polling Get transaction saves `playerToken` once the payment is APPROVED, which the Game requests use.\n\nAll money is integer cents in COP. Errors share one envelope `{ error: { code, message } }` -- switch on `code`, never on `message`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "List products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            },
+            "description": "Live stock. `stock.available` already has reserved units subtracted, and can go UP when someone else's payment fails."
+          },
+          "response": []
+        },
+        {
+          "name": "Get product",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "description": "404 PRODUCT_NOT_FOUND if absent."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Checkout",
+      "item": [
+        {
+          "name": "Create transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "transactions"
+              ]
+            },
+            "description": "Creates the transaction as PENDING and reserves stock. Card details are NOT sent here. Returns the server-computed `amounts` and the `reference` that is the idempotency key for the whole flow. Fails with OUT_OF_STOCK, PRODUCT_NOT_FOUND or VALIDATION_FAILED.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 1,\n  \"customer\": {\n    \"email\": \"someone@example.com\",\n    \"fullName\": \"Someone Real\",\n    \"phone\": \"+573001234567\"\n  },\n  \"delivery\": {\n    \"addressLine\": \"Calle 1 # 2-3\",\n    \"city\": \"Bogota\",\n    \"region\": \"Cundinamarca\",\n    \"postalCode\": \"110111\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Persist the reference so the later steps can use it.",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('reference', body.reference);",
+                  "  pm.test('returns a reference', () => pm.expect(body.reference).to.be.a('string'));",
+                  "  pm.test('server computed the total', () =>",
+                  "    pm.expect(body.amounts.totalCents).to.be.a('number'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pay transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/transactions/{{reference}}/pay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "transactions",
+                "{{reference}}",
+                "pay"
+              ]
+            },
+            "description": "The card is tokenised in the BROWSER against the gateway; the number never reaches this API. Returns 202 Accepted -- accepted, not decided. Safe to retry with the same reference: a second call returns current state rather than charging twice. Fails with TRANSACTION_NOT_FOUND, TRANSACTION_ALREADY_SETTLED, TRANSACTION_EXPIRED, PAYMENT_REJECTED.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentToken\": \"tok_stagtest_replace_me\",\n  \"acceptanceToken\": \"replace_me\",\n  \"installments\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get transaction (poll)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/transactions/{{reference}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "transactions",
+                "{{reference}}"
+              ]
+            },
+            "description": "Poll after paying. Suggested every 2s, give up at 60s and show pending copy rather than a failure -- the webhook may still land. `playerToken` and `creditsGranted` appear only on APPROVED."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('status is one of the four', () =>",
+                  "  pm.expect(['PENDING','APPROVED','DECLINED','ERROR']).to.include(body.status));",
+                  "if (body.playerToken) {",
+                  "  pm.collectionVariables.set('playerToken', body.playerToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get delivery",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/deliveries/{{reference}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "deliveries",
+                "{{reference}}"
+              ]
+            },
+            "description": "404 DELIVERY_NOT_FOUND before the transaction is approved."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Game",
+      "item": [
+        {
+          "name": "Get balance",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{playerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/balances/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "balances",
+                "me"
+              ]
+            },
+            "description": "Requires the playerToken from an APPROVED transaction."
+          },
+          "response": []
+        },
+        {
+          "name": "Spin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{playerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spins",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spins"
+              ]
+            },
+            "description": "Empty body. Debits one credit and returns the outcome the SERVER decided; the client only animates it. 402 INSUFFICIENT_CREDITS when out of credits.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Spin history",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{playerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spins?limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spins"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reference",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "playerToken",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
