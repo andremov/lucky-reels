@@ -14,7 +14,12 @@ export class HealthController {
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
   @Get()
-  @ApiOperation({ summary: 'Liveness and database reachability' })
+  @ApiOperation({
+    summary: 'Liveness and database reachability',
+    description:
+      'Returns 200 either way. status is ok when the database answers and degraded when it ' +
+      'does not, so a probe can tell a dead process from a dead connection.',
+  })
   async check(): Promise<HealthReport> {
     const database = await this.pingDatabase();
 

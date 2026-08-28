@@ -29,7 +29,12 @@ export class GameController {
   ) {}
 
   @Get('balances/me')
-  @ApiOperation({ summary: 'Credits available to the player holding this token' })
+  @ApiOperation({
+    summary: 'Credits available to this player',
+    description:
+      'Requires the playerToken issued when a purchase was approved, as a bearer token. ' +
+      'Credits are the currency of the machine: one buys one spin.',
+  })
   @ApiOkResponse({ type: BalanceResponse })
   async balance(@Headers('authorization') authorization?: string): Promise<{ credits: number }> {
     const result = await this.getBalance.execute(bearer(authorization));
@@ -53,7 +58,12 @@ export class GameController {
   }
 
   @Get('spins')
-  @ApiOperation({ summary: 'Recent spins for this player' })
+  @ApiOperation({
+    summary: 'Recent spins for this player',
+    description:
+      'Newest first. limit defaults to 20 and is capped at 50, so a large value cannot read ' +
+      'the whole table.',
+  })
   @ApiOkResponse({ type: SpinHistoryResponse })
   async history(
     @Headers('authorization') authorization?: string,
