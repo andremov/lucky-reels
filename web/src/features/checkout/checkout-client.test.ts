@@ -13,7 +13,7 @@ function mockFetch(responses: Array<{ ok?: boolean; status?: number; body?: unkn
       json: async () => body,
     });
   }
-  global.fetch = fetchMock as unknown as typeof fetch;
+  globalThis.fetch = fetchMock as unknown as typeof fetch;
   return fetchMock;
 }
 
@@ -157,7 +157,7 @@ describe('http checkout client', () => {
           throw new SyntaxError('Unexpected token <');
         },
       });
-      global.fetch = fetchMock as unknown as typeof fetch;
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
       const client = createHttpCheckoutClient(BASE);
 
       const error = await client.listProducts().catch((e) => e);
